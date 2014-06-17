@@ -2,6 +2,9 @@ from etsproxy.traits.api import \
     HasStrictTraits, Int, Float, Property, cached_property
 import numpy as np
 from scipy.interpolate import interp2d
+from etsproxy.traits.ui.api import \
+    View, Item, Group, HSplit, VGroup, HGroup, RangeEditor, InstanceEditor
+
 
 class ConstantBondCB(HasStrictTraits):
 
@@ -21,13 +24,17 @@ class ConstantBondCB(HasStrictTraits):
     sig_cu = Property(depends_on = 'sig_fu, v_f') # ultimate composite stress
     @cached_property
     def _get_sig_cu(self):
-        return self.sig_fu * self.v_f  
+        return self.sig_fu * self.v_f
+    eps_fu = Property(depends_on = 'sig_fu, E_f') # ultimate reinforcement strain
+    @cached_property
+    def _get_eps_fu(self):
+        return self.sig_fu / self.E_f
 
 #=============================================================================
 # interpolation parameters
 #=============================================================================    
     cbL = Float(200., i_para=True) #length [mm]
-    n_z = Int(200, i_para=True) #number of material points
+    n_z = Int(1000, i_para=True) #number of material points
     #coordinates of the material points
     cb_z = Property(depends_on='cbL, n_z')
     @cached_property
@@ -62,38 +69,71 @@ class ConstantBondCB(HasStrictTraits):
 # interpolation function
 #=============================================================================    
     # function for evaluating specimen matrix stress
-    get_sig_m_z = Property(depends_on='+m_para, +i_para')
+    interp_sig_m_z = Property(depends_on='+m_para, +i_para')
     @cached_property
-    def _get_get_sig_m_z(self):
+    def _get_interp_sig_m_z(self):
         return interp2d(self.cb_z, self.cb_sig_c, self.cb_sig_m, kind='linear')
     
+    def get_sig_m_z(self, z_arr, ll, lr, load):
+        return self.interp_sig_m_z(z_arr, load)
+
     # function for evaluating specimen reinforcement strain
-    get_eps_f_z = Property(depends_on='+m_para, +i_para')
+    interp_eps_f_z = Property(depends_on='+m_para, +i_para')
     @cached_property
-    def _get_get_eps_f_z(self):
+    def _get_interp_eps_f_z(self):
         return interp2d(self.cb_z, self.cb_sig_c, self.cb_eps_f, kind='linear')
+        
+    def get_eps_f_z(self, z_arr, ll, lr, load):
+        return  self.interp_eps_f_z(z_arr, load)
+    
+#=============================================================================
+# UI
+#=============================================================================
+    view = View(Group(Item('T', label='Bond intensity'),
+                      Item('E_m', label='Matrix modulus'),
+                      Item('E_f', label='Reinforcement modulus'),
+                      Item('v_f', label='Reinforcement ratio'),
+                      Item('cbL', label='Crack bridge length'),
+                      Item('n_z', label='Number of material points'),
+                      label='Crack Bridge Model', show_border=True))
+    
 
 if __name__ == '__main__':
     
     from matplotlib import pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
-        
-    cbcb = ConstantBondCB()
-    x = np.linspace(0, 1000, 1001)
-    sig = cbcb.get_sig_m_z(x, cbcb.sig_cu/2)
-    eps = cbcb.get_eps_f_z(x, cbcb.sig_cu/2)
     
-    fig = plt.figure(figsize=(10,10))
-    ax1 = fig.add_subplot(221, projection='3d')
-    X, Y = np.meshgrid(cbcb.cb_z, cbcb.cb_sig_c)
-    ax1.plot_wireframe(X, Y, cbcb.cb_sig_m, rstride=10, cstride=20)
-    ax2 = fig.add_subplot(222)
-    ax2.plot(x, sig)
-    ax3 = fig.add_subplot(223, projection='3d')
-    ax3.plot_wireframe(X, Y, cbcb.cb_eps_f, rstride=10, cstride=20)
-    ax4 = fig.add_subplot(224)
-    ax4.plot(x, eps)
+    ll, lr = 0, 0
+        
+    cbcb = ConstantBondCB(n_z = 1000)
+    cbcb1 = ConstantBondCB(n_z = 1000)
+
+#     cbcb.configure_traits()
+    x = np.linspace(0, 1000, 10001)
+    sig = cbcb.get_sig_m_z(x, ll, lr, cbcb.sig_cu/4)
+    eps = cbcb.get_eps_f_z(x, ll, lr, cbcb.sig_cu/4)
+    
+    sig1 = cbcb1.get_sig_m_z(x, ll, lr, cbcb.sig_cu/4)
+    eps1 = cbcb1.get_eps_f_z(x, ll, lr, cbcb.sig_cu/4)
+    
+    print sig == sig1
+    
+    plt.plot(x, sig - sig1)
+#     plt.plot(x, sig1)
+    
     plt.show()
+#     fig = plt.figure(figsize=(10,10))
+#     ax1 = fig.add_subplot(221, projection='3d')
+#     X, Y = np.meshgrid(cbcb.cb_z, cbcb.cb_sig_c)
+#     ax1.plot_wireframe(X, Y, cbcb.cb_sig_m, rstride=10, cstride=20)
+#     ax2 = fig.add_subplot(222)
+#     ax2.plot(x, sig)
+#     ax2.plot(x, sig1)
+#     ax3 = fig.add_subplot(223, projection='3d')
+#     ax3.plot_wireframe(X, Y, cbcb.cb_eps_f, rstride=10, cstride=20)
+#     ax4 = fig.add_subplot(224)
+#     ax4.plot(x, eps)
+#     plt.show()
 
 
 
