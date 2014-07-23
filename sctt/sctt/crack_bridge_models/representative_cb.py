@@ -15,7 +15,7 @@ from mpl_toolkits.mplot3d import axes3d
 import time as t
 
 
-class StochasticCB(HasStrictTraits):
+class RepresentativeCB(HasStrictTraits):
     
     ccb = Instance(CompositeCrackBridge)
     n_BC = Int(8) #number of different boundary conditions in the interpolator
@@ -201,7 +201,7 @@ if __name__ == '__main__':
                           E_f=180e3,
                           xi=fibers_MC(m=2.0, sV0=0.003),
                           label='carbon',
-                          n_int=100)
+                          n_int=200)
      
     cb1 = CompositeCrackBridge(E_m=25e3,
                                reinforcement_lst=[reinf]
@@ -214,8 +214,8 @@ if __name__ == '__main__':
      
     z = np.linspace(0, 500, 501)
 #     _lambda = np.ones_like(x)*60
-    LL = np.ones_like(z)*1
-    LR = np.ones_like(z)*90
+    LL = np.ones_like(z)*9.29
+    LR = np.ones_like(z)*225.36
 #       
 #     BC = np.vstack([LL, LR])
     
@@ -226,7 +226,12 @@ if __name__ == '__main__':
 #     t2 = t.clock()
 #     print '--', t2
 #     for i in range(1000):
-    sig_m = scb.get_sig_m_z(z, LL, LR, 100)
+    sig = np.zeros(100)
+    i = 0
+    for load in np.linspace(60, scb.sig_cu, 100):
+        sig_m = scb.get_sig_m_z(z, LL, LR, load)
+        sig[i] = sig_m[9]
+        i +=1
 #     print 't2', t.clock()-t2
 #     print x, sig_m
 #     sig_m = scb.get_sig_m_z(points.T)
@@ -235,9 +240,9 @@ if __name__ == '__main__':
 #      
 #     print len(x)
 #   
-    fig1 = plt.figure()
-    ax2 = fig1.add_subplot(111)
-    ax2.plot(z, sig_m)
+#         fig1 = plt.figure()
+#         ax2 = fig1.add_subplot(111)
+        plt.plot(np.linspace(60, 85, 100), sig)
     plt.show()
 
     

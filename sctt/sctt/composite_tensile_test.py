@@ -3,7 +3,7 @@ from etsproxy.traits.api import \
     cached_property
 import numpy as np
 from scipy.interpolate import interp1d
-from scipy.optimize import brentq
+from scipy.optimize import brentq, minimize_scalar, fmin, brute
 from random_fields.simple_random_field import SimpleRandomField
 from crack_bridge_models.constant_bond_cb import ConstantBondCB
 from crack_bridge_models.stochastic_cb import StochasticCB
@@ -18,6 +18,8 @@ from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
 from spirrid.rv import RV
 from stats.misc.random_field.random_field_1D import RandomField
+from matplotlib import pyplot as plt
+
 
 class CompositeTensileTest(HasStrictTraits):
     
@@ -72,16 +74,28 @@ class CompositeTensileTest(HasStrictTraits):
 #=============================================================================
 # Determine the cracking load level
 #=============================================================================
+
     def get_sig_c_z(self, sig_mu, z, Ll, Lr):
-        '''Determine the composite remote stress initiating a crack at position z
-        '''
+        '''Determine the composite remote stress initiating a crack 
+        at position z'''
         fun = lambda sig_c: sig_mu - self.cb.get_sig_m_z(z, Ll, Lr, sig_c)
         try:
-        # search the cracking stress level between zero and ultimate composite stress
-            return brentq(fun, 0, 1000)
+        # search the cracking stress level between zero and ultimate
+        # composite stress
+            return brentq(fun, 0, self.cb.sig_cu)
+        
         except ValueError:
-            # solution not found (shielded zone) return the ultimate composite stress
-            return self.cb.sig_cu
+        # solution not found 
+            try:
+            # find the load level corresponding to the maximum matrix stress
+            # (non-monotonic)
+                sig_m = lambda sig_c: -self.cb.get_sig_m_z(z, Ll, Lr, sig_c)
+                sig_max = brute(sig_m, ((0., self.cb.sig_cu),), Ns=6)[0]
+                return brentq(fun, 0, sig_max)
+            
+            except ValueError:
+            # shielded zone, impossible to crack, return the ultimate stress 
+                return self.cb.sig_cu
          
     get_sig_c_x_i = np.vectorize(get_sig_c_z)
      
@@ -111,8 +125,7 @@ class CompositeTensileTest(HasStrictTraits):
             self.y.append(y_i)
             sig_c_lst.append(sig_c_i)
             z_x_lst.append(np.array(self.z_x))
-            BC_x_lst.append(np.array(self.BC_x))
-            print sig_c_i, y_i
+            BC_x_lst.append(np.array(self.BC_x))            
             if sig_c_i == self.cb.sig_cu: break
         print 'cracking history determined'
         self.y = []
@@ -145,7 +158,8 @@ class CompositeTensileTest(HasStrictTraits):
         ''' 
         eps_m = np.zeros_like(self.x)
         z_x_map = np.argsort(z_x)
-        eps_m[z_x_map] = self.cb.get_sig_m_z(z_x[z_x_map], Ll_arr, Lr_arr, sig_c)
+        eps_m[z_x_map] = self.cb.get_sig_m_z(z_x[z_x_map], Ll_arr[z_x_map], \
+                                             Lr_arr[z_x_map], sig_c)
         return eps_m
     
     def get_eps_c_arr(self, sig_c_i, z_x_i, BC_x_i, load_arr):
@@ -162,6 +176,15 @@ class CompositeTensileTest(HasStrictTraits):
                 BC_x = BC_x_i[idx]
                 eps_arr[i] = np.trapz(self.get_eps_f_x(load, z_x, BC_x[0], \
                                       BC_x[1]), self.x) / self.L
+            
+            #save the cracking history
+            plt.clf()                          
+            sig_m = self.get_sig_m_x(load, z_x, BC_x[0], BC_x[1])
+            plt.plot(self.x, sig_m)
+            plt.plot(self.x, self.sig_mu_x)
+            savepath = 'D:\cracking history\\1\\load_step'+str(i+1)+'.png'
+            plt.savefig(savepath)
+            
         return eps_arr
     
     def get_w_dist(self, sig_c_i, z_x_i, BC_x_i):
@@ -169,7 +192,6 @@ class CompositeTensileTest(HasStrictTraits):
         '''
         w_dist = []
         for sig_c, z_x, BC_x in zip(sig_c_i, z_x_i, BC_x_i):
-#             try:
             eps_f_x = self.get_eps_f_x(sig_c, z_x, BC_x[0], BC_x[1])
             eps_m_x = self.get_sig_m_x(sig_c, z_x, BC_x[0], BC_x[1]) / self.cb.E_m
             y = self.x[z_x == 0]
@@ -182,9 +204,30 @@ class CompositeTensileTest(HasStrictTraits):
                                        self.x[nearest_crack == y_i] ) \
                                for y_i in y])
             w_dist.append(w_arr)
-#             except:
-#                 print y
         return w_dist
+    
+    def save_cracking_history(self, sig_c_i, z_x_lst, BC_x):
+        '''save the cracking history'''
+        plt.clf()
+        plt.subplot(411)
+        i = len(z_x_lst)
+        BC_x = BC_x_lst[i-2]                          
+        sig_m = self.get_sig_m_x(sig_c_i, z_x_lst[i-2], BC_x[0], BC_x[1])
+        print sig_c_i
+        plt.plot(self.x, sig_m)
+        plt.plot(self.x, self.sig_mu_x)
+        
+        plt.subplot(412)
+        plt.plot(self.x, self.z_x)
+
+        plt.subplot(413)
+        plt.plot(self.x, self.BC_x[0])
+        
+        plt.subplot(414)
+        plt.plot(self.x, self.BC_x[1])
+        savepath = 'D:\cracking history\\1\\BC'+str(len(self.y))+'.png'
+        plt.savefig(savepath)
+
                
             
     
@@ -210,58 +253,74 @@ if __name__ == '__main__':
     
     scb = StochasticCB(ccb=cb1)
          
-    cbcb = ConstantBondCB(n_z = 500)
+    cbcb = ConstantBondCB(n_z = 500,
+                          T = 30)
         
-    rf = SimpleRandomField(n_x = 501,
-                           mean = 40,
-                           deviation = 6)
+#     rf = SimpleRandomField(n_x = 501,
+#                            mean = 4,
+#                            deviation = 1.)
     
-    print np.amin(rf.field)
+    random_field = RandomField(seed=False,
+                           lacor=10.,
+                           length=500,
+                           nx=501,
+                           nsim=1,
+                           loc=.0,
+                           shape=15.,
+                           scale=40.0,
+                           distr_type='Weibull')
         
     ctt = CompositeTensileTest(n_x = 501,
                                L = 500,
                                cb=scb,
-                               sig_mu_x= rf.field)
+                               sig_mu_x= random_field.random_field)
+    
+    print np.amin(ctt.sig_mu_x)
     
     sig_c_i, z_x_i, BC_x_i = ctt.get_cracking_history()
     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
     
+#     np.savetxt('D:\cracking history\\1\\cracking_loads.txt', sig_c_i)
+#     np.savetxt('D:\cracking history\\1\\dmin.txt', z_x_i)
+#     np.savetxt('D:\cracking history\\1\\BC.txt', BC_x_i)
+
+
+    
         
-    load_arr = np.linspace(0, ctt.cb.sig_cu, 100)
+    load_arr = np.linspace(0, ctt.cb.sig_cu, 200)
     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
     w_dist = ctt.get_w_dist(sig_c_i, z_x_i, BC_x_i)
       
 #     ctt.configure_traits()
       
-    from matplotlib import pyplot as plt
     plt.subplot(2, 2, 1)
     plt.plot(eps_c_i, sig_c_i)
     plt.plot([0.0, ctt.cb.sig_cu/ctt.cb.E_c], [0.0, ctt.cb.sig_cu])
     plt.plot(eps_c_arr, load_arr)
 #     plt.plot([0.0, ctt.cb.eps_fu], [0.0, ctt.cb.sig_cu])
       
-#     plt.subplot(2, 2, 2)
-#     for i in range(1, len(z_x_i)):
-#         plt.plot(ctt.x, ctt.get_eps_f_x(sig_c_i[i], z_x_i[i]))
-#         plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i]) / ctt.cb.E_m)
-#     plt.ylim(ymin=0.0)
+    plt.subplot(2, 2, 2)
+    for i in range(1, len(z_x_i)):
+        plt.plot(ctt.x, ctt.get_eps_f_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
+        plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]) / ctt.cb.E_m)
+    plt.ylim(ymin=0.0)
     
     plt.subplot(2, 2, 3)
-#     plt.plot(ctt.x, z_x_i[-1])
-#     plt.plot(ctt.x, ctt.sig_mu_x)
-#     plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[-2], z_x_i[-2], BC_x_i[-2][0], BC_x_i[-2][1]))
-#     plt.hist(w_dist[-2])
+    plt.plot(ctt.x, z_x_i[-1])
+    plt.plot(ctt.x, ctt.sig_mu_x)
+    plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[-2], z_x_i[-2], BC_x_i[-2][0], BC_x_i[-2][1]))
+    plt.hist(w_dist[-2])
     
-#     plt.subplot(2, 2, 4)
-#     plt.plot(ctt.x, ctt.sig_mu_x)
-#     for i in range(1, len(z_x_i)):
-#         plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i]))
-#     plt.ylim(ymin=0.0)
+    plt.subplot(2, 2, 4)
+    plt.plot(ctt.x, ctt.sig_mu_x)
+    for i in range(1, len(z_x_i)):
+        plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
+    plt.ylim(ymin=0.0)
 
-    plt.subplot(2, 2, 2)
-    BC_x = BC_x_i[-2]
-    plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[-2], z_x_i[-2], BC_x[0], BC_x[1]))
-    plt.plot(ctt.x, rf.field)
+#     plt.subplot(2, 2, 2)
+#     BC_x = BC_x_i[-2]
+#     plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[-2], z_x_i[-2], BC_x[0], BC_x[1]))
+#     plt.plot(ctt.x, rf.field)
    
     plt.show()
 
