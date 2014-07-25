@@ -17,7 +17,7 @@ class Calibration(HasTraits):
 # Parameters
 #===============================================================================        
     # fiber stress data from experiment
-    data = Array
+    experi_data = Array
     # the tau samples
     tau_arr = Array(input=True)
     # fiber radius
@@ -61,29 +61,31 @@ class Calibration(HasTraits):
 
 #===============================================================================
 # optimization
-#===============================================================================        
+#===============================================================================            
+    def residual(self, x):
+        self.sV0 = float(x)
+        sigma = self.responses
+        sigma[0] = 1e6*np.ones_like(cali.tau_arr)
+        data = self.experi_data
+        data[0] = 1e6
+        residual = nnls(sigma, data)[1]
+        return residual
+    
     def optimize_sV0(self):
-        def residual(self, x):
-            self.sV0 = float(x)
-            sigma = self.responses
-            sigma[0] = 1e6*np.ones_like(cali.tau_arr)
-            self.data[0] = 1e6
-            residual = nnls(sigma, self.data)[1]
-            self.data[0] = 0.
-            return residual
-        sV0 = brute(residual, ((0.0001, 0.01),), Ns=10)
-        print '1', sV0
-        return sV0
+        sV0 = brute(self.residual, ((0.0001, 0.01),), Ns=10)
+        return float(sV0)
     
     def tau_weights(self):
         sigma = self.responses
         sigma[0] = 1e6*np.ones_like(cali.tau_arr)
-        data = self.data
+        data = self.experi_data
         data[0] = 1e6
         x, y = nnls(sigma, data)
         sigma[0] = np.zeros_like(cali.tau_arr)
         data[0] = 0.
         return x
+    
+    
 
         
 
@@ -112,23 +114,11 @@ if __name__ == '__main__':
                 
 #     for m in np.linspace(2., 30., 29):
     
-    cali = Calibration(data=data,
+    cali = Calibration(experi_data=data,
                        w_arr=w_arr,
                        tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
-    
-#===============================================================================
-# optimize sV0 (minimize the difference using brute)
-#===============================================================================        
-    def residual(x):
-        cali.sV0 = float(x)
-        sigma = cali.responses
-        sigma[0] = 1e6*np.ones_like(cali.tau_arr)
-        data[0] = 1e6
-        residual = nnls(sigma, data)[1]
-        return residual
-    sV0 = brute(residual, ((0.0001, 0.01),), Ns=10)
-    cali.sV0 = float(sV0)
 
+    cali.optimize_sV0()
 #===============================================================================
 # output
 #===============================================================================        
