@@ -46,12 +46,43 @@ class StochasticCB(HasStrictTraits):
                        *self.ccb.sorted_V_f * self.ccb.sorted_nu_r \
                        *self.ccb.sorted_E_f * (1. - self.ccb.damage))
         return -sig_c
+        
+    def sigma_c_max(self):
+        def minfunc_sigma(w):
+            self.ccb.w = w
+            stiffness_loss = np.sum(self.ccb.Kf * self.ccb.damage) / np.sum(self.ccb.Kf)
+            if stiffness_loss > 0.90:
+                return 1. + w
+            # plt.plot(w, self.sigma_c, 'ro')
+            return self.minus_sig_c(w)
+        
+        def residuum_stiffness(w):
+            self.ccb.w = w
+            stiffness_loss = np.sum(self.ccb.Kf * self.ccb.damage) / np.sum(self.ccb.Kf)
+            if stiffness_loss > 0.90:
+                return 1. + w
+            if stiffness_loss < 0.65 and stiffness_loss > 0.45:
+                residuum = 0.0
+            else:
+                residuum = stiffness_loss - 0.5
+            return residuum
+
+        w_max = brentq(residuum_stiffness, 0.0, min(0.1 * (self.ccb.Ll + self.ccb.Lr), 20.))
+        w_points = np.linspace(0, w_max, 7)
+        w_maxima = []
+        sigma_maxima = []
+        for i, w in enumerate(w_points[1:]):
+            w_max = fminbound(minfunc_sigma, w_points[i], w_points[i + 1], maxfun=5, disp=0)
+            w_maxima.append(w_max)
+            sigma_maxima.append(-self.minus_sig_c(w_max))
+        return sigma_maxima[np.argmax(np.array(sigma_maxima))], w_maxima[np.argmax(np.array(sigma_maxima))]
+
 
     ultimate_state = Property(depends_on='n_BC, CB_model')
     @cached_property
     def _get_ultimate_state(self):
-        self.ccb.Ll = 1e3
-        self.ccb.Lr = 1e3
+        self.ccb.Ll = 1e5
+        self.ccb.Lr = 1e5
         w_max = fmin(self.minus_sig_c, 1., full_output=1, disp=0)
         sig_cu = -w_max[1]
         self.ccb.w = w_max[0][0]
@@ -194,16 +225,16 @@ if __name__ == '__main__':
 #     from matplotlib import cm
 #     import time as t
 
-    reinf = ContinuousFibers(r=0.0035,
-                          tau=RV('weibull_min', loc=0.0, shape=1., scale=1.),
-                          V_f=0.01,
-                          E_f=180e3,
-                          xi=fibers_MC(m=2.0, sV0=0.003),
-                          label='carbon',
-                          n_int=100)
+    reinf1 = ContinuousFibers(r=3.5e-3,
+                              tau=RV('weibull_min', loc=0.01, scale=.1, shape=2.),
+                              V_f=0.005,
+                              E_f=200e3,
+                              xi=fibers_MC(m=7., sV0=0.005),
+                              label='carbon',
+                              n_int=500)
 
     cb1 = CompositeCrackBridge(E_m=25e3,
-                               reinforcement_lst=[reinf]
+                               reinforcement_lst=[reinf1]
                                  )
 
     scb = StochasticCB(ccb=cb1)

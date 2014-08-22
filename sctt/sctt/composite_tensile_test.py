@@ -7,6 +7,7 @@ from scipy.optimize import brentq, minimize_scalar, fmin, brute
 from random_fields.simple_random_field import SimpleRandomField
 from crack_bridge_models.constant_bond_cb import ConstantBondCB
 from crack_bridge_models.stochastic_cb import StochasticCB
+from crack_bridge_models.representative_cb import RepresentativeCB
 from util.traits.either_type import EitherType
 from etsproxy.traits.ui.api import \
     View, Item, Group
@@ -19,12 +20,15 @@ from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
 from spirrid.rv import RV
 from stats.misc.random_field.random_field_1D import RandomField
 from matplotlib import pyplot as plt
+from crack_bridge_models.random_bond_cb import RandomBondCB, FiberBundle
+from calibration import Calibration
+import os.path
 
 
 class CompositeTensileTest(HasStrictTraits):
     
     cb = EitherType(klasses=[ConstantBondCB, \
-                             StochasticCB]) #crack bridge model
+                             RepresentativeCB]) #crack bridge model
 
 #=============================================================================
 # Discretization of the specimen
@@ -122,6 +126,7 @@ class CompositeTensileTest(HasStrictTraits):
         sig_c_lst = [0.0]
         while True:
             sig_c_i, y_i = self.get_sig_c_i()
+            print sig_c_i, y_i
             self.y.append(y_i)
             sig_c_lst.append(sig_c_i)
             z_x_lst.append(np.array(self.z_x))
@@ -206,7 +211,7 @@ class CompositeTensileTest(HasStrictTraits):
             w_dist.append(w_arr)
         return w_dist
     
-    def save_cracking_history(self, sig_c_i, z_x_lst, BC_x):
+    def save_cracking_history(self, sig_c_i, z_x_lst, BC_x_lst):
         '''save the cracking history'''
         plt.clf()
         plt.subplot(411)
@@ -240,39 +245,76 @@ class CompositeTensileTest(HasStrictTraits):
 # output
 #=============================================================================    
 if __name__ == '__main__':
-    reinf = ContinuousFibers(r=0.0035,
-                          tau=RV('weibull_min', loc=0.0, shape=1., scale=1.),
-                          V_f=0.01,
-                          E_f=180e3,
-                          xi=fibers_MC(m=2.0, sV0=0.003),
-                          label='carbon',
-                          n_int=200)
-     
-    cb1 = CompositeCrackBridge(E_m=25e3,
-                               reinforcement_lst=[reinf])
     
-    scb = StochasticCB(ccb=cb1)
+    #=============================================================================
+    # calibration
+    #=============================================================================
+    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2    
+    home_dir = 'D:\\Eclipse\\'
+    path = [home_dir, 'git',  # the path of the data file
+            'rostar',
+            'scratch',
+            'diss_figs',
+            'CB1.txt']
+    filepath = os.path.join(*path)
+    exp_data = np.zeros_like(w_arr)
+    file1 = open(filepath, 'r')
+    cb = np.loadtxt(file1, delimiter=';')
+    test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
+    test_ydata = cb[:, 1] / (11. * 0.445) * 1000
+    interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
+    exp_data = interp(w_arr)
+    cali = Calibration(experi_data=exp_data,
+                       w_arr=w_arr,
+                       tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
+    tau_ind = np.nonzero(cali.tau_weights)
+    
+    
+    
+    reinf = FiberBundle(r=0.0035,
+                  tau=cali.tau_arr[tau_ind],
+                  tau_weights = cali.tau_weights[tau_ind],
+                  V_f=0.1,
+                  E_f=200e3,
+                  xi=fibers_MC(m=cali.m, sV0=cali.sV0))
+
+
+    
+#     reinf = ContinuousFibers(r=0.0035,
+#                           tau=RV('weibull_min', loc=0.0, shape=1., scale=1.),
+#                           V_f=0.01,
+#                           E_f=180e3,
+#                           xi=fibers_MC(m=2.0, sV0=0.003),
+#                           label='carbon',
+#                           n_int=200)
+     
+#     cb1 = CompositeCrackBridge(E_m=25e3,
+#                                reinforcement_lst=[reinf])
+    cb =  RandomBondCB(E_m=25e3,
+                       reinforcement_lst=[reinf])
+    
+    rcb = RepresentativeCB(ccb=cb)
          
-    cbcb = ConstantBondCB(n_z = 500,
-                          T = 30)
+#     cbcb = ConstantBondCB(n_z = 500,
+#                           T = 30)
         
 #     rf = SimpleRandomField(n_x = 501,
 #                            mean = 4,
 #                            deviation = 1.)
     
     random_field = RandomField(seed=False,
-                           lacor=10.,
-                           length=500,
+                           lacor=1.,
+                           length=100,
                            nx=501,
                            nsim=1,
                            loc=.0,
-                           shape=15.,
-                           scale=40.0,
+                           shape=50.,
+                           scale=3.4,
                            distr_type='Weibull')
         
     ctt = CompositeTensileTest(n_x = 501,
-                               L = 500,
-                               cb=scb,
+                               L = 100,
+                               cb=rcb,
                                sig_mu_x= random_field.random_field)
     
     print np.amin(ctt.sig_mu_x)

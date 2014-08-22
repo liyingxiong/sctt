@@ -46,7 +46,8 @@ class Calibration(HasTraits):
         Gxi = 1 - np.exp(-(ef0 / s) ** (self.m + 1))
         mu_int = ef0 * (1 - Gxi)
         I = s * gamma(1 + 1. / (self.m + 1)) * gammainc(1 + 1. / (self.m + 1), (ef0 / s) ** (self.m + 1))
-        mu_broken = I / (self.m + 1)
+#         mu_broken = I / (self.m + 1)
+        mu_broken = 0.
         sigma = (mu_int + mu_broken) * self.E_f
         return sigma
 
@@ -60,7 +61,7 @@ class Calibration(HasTraits):
         and the value of the lack of fit.
         '''
         sigma = self.get_sigma_tau_w(sV0)
-        sigma[0] = 1e6 * np.ones_like(cali.tau_arr)
+        sigma[0] = 1e6 * np.ones_like(self.tau_arr)
         data = np.copy(self.experi_data)
         data[0] = 1e6
         return nnls(sigma, data)
@@ -96,7 +97,8 @@ if __name__ == '__main__':
 #===============================================================================
 # read experimental data
 #===============================================================================
-    home_dir = get_home_directory()
+#     home_dir = get_home_directory()
+    home_dir = 'D:\\Eclipse\\'
     path = [home_dir, 'git',  # the path of the data file
             'rostar',
             'scratch',

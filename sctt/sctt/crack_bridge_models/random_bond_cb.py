@@ -4,64 +4,23 @@ from util.traits.either_type import EitherType
 from types import FloatType
 from spirrid.rv import RV
 from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
+from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement import \
+    ContinuousFibers
+from reinforcements.fiber_bundle import FiberBundle
 import numpy as np
-from scipy.optimize import root
+from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg
 from scipy.integrate import cumtrapz
+import time as t
 from matplotlib import pyplot as plt
-
-class FiberBoundle(HasTraits):
-    
-#===============================================================================
-# Parameters
-#===============================================================================        
-    E_f = Float(180e3) # the elastic modulus of the fiber
-    V_f = Float # volume fraction
-#     tau = EitherType(klasses=[FloatType, Array, RV]) # bond stiffness
-    tau = Array
-    tau_weights =Array # the weights for tau, applicable when tau is an array
-    xi = EitherType(klasses=[FloatType, RV, WeibullFibers]) # breaking strain
-    r = EitherType(klasses=[FloatType, RV]) # fiber radius
-    n_int = Int(10) # number of integration points
-    
-#===============================================================================
-# Sampling
-#===============================================================================        
-    samples = Property(depends_on='r, V_f, E_f, xi, tau, n_int')
-    @cached_property
-    def _get_samples(self):
-        if isinstance(self.tau, np.ndarray):
-            tau_arr = self.tau
-            stat_weights = self.tau_weights
-        return 2*tau_arr/self.r/self.E_f, stat_weights, \
-               np.ones_like(tau_arr), self.r*np.ones_like(tau_arr)
-               
-    depsf_arr = Property(depends_on='r, V_f, E_f, xi, tau, n_int')
-    @cached_property
-    def _get_depsf_arr(self):
-        return self.samples[0]
-
-    stat_weights = Property(depends_on='r, V_f, E_f, xi, tau, n_int')
-    @cached_property
-    def _get_stat_weights(self):
-        return self.samples[1]
-
-    nu_r = Property(depends_on='r, V_f, E_f, xi, tau, n_int')
-    @cached_property
-    def _get_nu_r(self):
-        return self.samples[2]
-
-    r_arr = Property(depends_on='r, V_f, E_f, xi, tau, n_int')
-    @cached_property
-    def _get_r_arr(self):
-        return self.samples[3]
+from scipy.interpolate import interp1d, interp2d, griddata, LinearNDInterpolator
 
         
 class RandomBondCB(HasTraits):
     
-#===============================================================================
-# Parameters
-#===============================================================================    
-    reinforcement_lst = List(Instance(FiberBoundle))
+    #===============================================================================
+    # Material Parameters
+    #===============================================================================    
+    reinforcement_lst = List(EitherType(klasses=[FiberBundle, ContinuousFibers]))
     E_m = Float(25e3) # the elastic modulus of the matrix
     w = Float # the crack width
     # the BCs
@@ -85,9 +44,22 @@ class RandomBondCB(HasTraits):
         E_c = self.E_m * (1. - self.V_f_tot) + E_fibers
         return E_c * (1. + 1e-15)
     
-#===============================================================================
-# sorts the integral points according to bond intensity in descending order
-#===============================================================================    
+    #===============================================================================
+    # Interpolation Parameters
+    #===============================================================================    
+    n_BC = Int(10) #number of discretized boundary conditions
+    
+    n_Int = Property(depends_on='reinforcement_lst')
+    @cached_property
+    def _get_n_Int(self):
+        n_Int = 0
+        for reinf in self.reinforcement_lst:
+            n_Int += reinf.n_int
+        return n_Int
+
+    #===============================================================================
+    # sorts the integral points according to bond intensity in descending order
+    #===============================================================================    
     sorted_theta = Property(depends_on='reinforcement_lst+')
     @cached_property
     def _get_sorted_theta(self):
@@ -104,7 +76,11 @@ class RandomBondCB(HasTraits):
             V_f_arr = np.hstack((V_f_arr, np.repeat(reinf.V_f, n_int)))
             E_f_arr = np.hstack((E_f_arr, np.repeat(reinf.E_f, n_int)))
             xi_arr = np.hstack((xi_arr, np.repeat(reinf.xi, n_int)))
-            stat_weights_arr = np.hstack((stat_weights_arr, reinf.stat_weights))
+            if isinstance(reinf.tau, np.ndarray):
+                stat_weights_arr = np.hstack((stat_weights_arr, reinf.stat_weights))
+            else:
+                stat_weights_arr = np.hstack((stat_weights_arr,
+                                              np.repeat(reinf.stat_weights, n_int)))
             nu_r_arr = np.hstack((nu_r_arr, reinf.nu_r))
             r_arr = np.hstack((r_arr, reinf.r_arr))
         argsort = np.argsort(depsf_arr)[::-1]
@@ -165,12 +141,12 @@ class RandomBondCB(HasTraits):
     @cached_property
     def _get_sorted_xi_cdf(self):
         '''breaking strain: CDF for random and Heaviside for discrete values'''
-        # TODO: does not work for reinforcement types with the same xi
+#         TODO: does not work for reinforcement types with the same xi
         methods = []
         masks = []
         for reinf in self.reinforcement_lst:
-            print self.sorted_xi
-            print reinf.xi
+#             print self.sorted_xi
+#             print reinf.xi
             masks.append(self.sorted_xi == reinf.xi)
             if isinstance(reinf.xi, FloatType):
                 methods.append(lambda x: 1.0 * (reinf.xi <= x))
@@ -182,9 +158,9 @@ class RandomBondCB(HasTraits):
                 methods.append(reinf.xi.cdf)
         return methods, masks
 
-#===============================================================================
-# evaluate maximum fiber strain and matrix strain profile 
-#===============================================================================        
+    #===============================================================================
+    # evaluate maximum fiber strain and matrix strain profile 
+    #===============================================================================        
     Kf = Property(depends_on='reinforcement_lst+')
     @cached_property
     def _get_Kf(self):
@@ -344,9 +320,9 @@ class RandomBondCB(HasTraits):
             a_long = np.hstack((a_long, Lmax * np.ones(len(self.sorted_depsf) - len(a_long))))
         return epsf0, a_short, a_long
 
-#===============================================================================
-# solving the damage portion of the reinforcement
-#===============================================================================        
+    #===============================================================================
+    # calculate the damage portion of the reinforcement
+    #===============================================================================        
     def vect_xi_cdf(self, epsy, x_short, x_long):
         '''evaluate the damage portion for the given maximum fiber strain array
         and boundary condition
@@ -395,44 +371,211 @@ class RandomBondCB(HasTraits):
             except:
                 print 'fast opt method does not converge: switched to a slower, robust method for this step'
                 damage = root(self.damage_residuum, np.ones_like(self.sorted_depsf) * 0.2,
-                              method='krylov')
+                              method='hybr')
                 damage = damage.x
         return damage
     
+    #===============================================================================
+    # composite stress at crack position as a function of crack width w
+    #===============================================================================
+    def sig_c(self, w):
+        self.w = float(w)
+        self.damage
+        sig_c = np.sum(self._epsf0_arr*self.sorted_stats_weights \
+                       *self.sorted_V_f*self.sorted_nu_r \
+                       *self.sorted_E_f*(1. - self.damage))
+        return sig_c
+    
+    #===============================================================================
+    # maximum sig_c and the corresponding crack width w_max
+    #===============================================================================
+    def sig_c_max(self):
+        def minfunc_sig_c(w):
+            self.w = float(w)
+            stiffness_loss = np.sum(self.Kf * self.damage) / np.sum(self.Kf)
+            if stiffness_loss > 0.90:
+                return 1. + w
+            return -self.sig_c(w)
+        
+        def residuum_stiffness(w):
+            self.w = w
+            stiffness_loss = np.sum(self.Kf * self.damage) / np.sum(self.Kf)
+            if stiffness_loss > 0.90:
+                return 1. + w
+            if stiffness_loss < 0.65 and stiffness_loss > 0.45:
+                residuum = 0.0
+            else:
+                residuum = stiffness_loss - 0.5
+            return residuum        
+        
+        w_max = brentq(residuum_stiffness, 0.0, min(0.1 * (self.Ll + self.Lr), 20.))
+        w_points = np.linspace(0, w_max, 7)
+        w_maxima = []
+        sigma_maxima = []
+        for i, w in enumerate(w_points[1:]):
+            w_max = fminbound(minfunc_sig_c, w_points[i], w_points[i + 1], maxfun=5, disp=0)
+            w_maxima.append(w_max)
+            sigma_maxima.append(self.sig_c(w_max))
+        return sigma_maxima[np.argmax(np.array(sigma_maxima))], w_maxima[np.argmax(np.array(sigma_maxima))]
+    
+    #===============================================================================
+    # discretization of the boundary condition
+    #===============================================================================
+    BC_range = Property(depends_on = 'reinforcement_lst+, E_m')
+    @cached_property
+    def _get_BC_range(self):
+        self.Lr, self.Ll = 1e5, 1e5
+        self.sig_c_max()
+        L_max = self._x_arr[-2] #maximum debonding length
+        BC_range = np.logspace(np.log10(0.02*L_max), np.log10(L_max), self.n_BC)
+        return BC_range
+    
+    #=============================================================================
+    # prepare the interpolator for each Boundary Condition
+    #=============================================================================    
+    interps = Property(denpends_on='ccb')
+    @cached_property
+    def _get_interps(self):
+        interps_sigm = []
+        interps_epsf = []
+        t1 = t.clock()
+        print 'preparing the interpolators:'
+        for j, L_r in enumerate(self.BC_range):
+            for q, L_l in enumerate(self.BC_range):
+                if L_l <= L_r:
+                    self.Ll = L_l
+                    self.Lr = L_r
+                    w_max = self.sig_c_max()[1]
+                    # w is discretized in such a way that the corresponding sig_c 
+                    # are more evenly distributed
+                    w_arr = np.linspace(np.sqrt(w_max), 1e-15, 20)**2
+                    # a uniform x coordinates for interpolation 
+                    x_arr_record = np.linspace(0, L_r, self.n_Int)
+     
+                    epsf_record = []
+                    sigm_record = []
+                    sigc_record = []
+                    
+                    for w in w_arr:
+                        self.w = w
+                        self.damage
+                                                                        
+                        epsf_x = np.zeros_like(self._x_arr)
+                        for i, depsf in enumerate(self.ccb.sorted_depsf):
+                            epsf_x += np.maximum(self.ccb._epsf0_arr[i] - \
+                                depsf * np.abs(self._x_arr), \
+                                self.ccb._epsm_arr)*self.ccb.sorted_stats_weights[i]
+                                
+                        sigm_x = self.ccb._epsm_arr*self.ccb.E_m
+                            
+                        sigc = np.sum(self.ccb._epsf0_arr \
+                                    *self.ccb.sorted_stats_weights \
+                                    *self.ccb.sorted_V_f*self.ccb.sorted_nu_r \
+                                    *self.ccb.sorted_E_f*(1. - self.ccb.damage))
+                        
+                        #=============================================================================
+                        # reshape the strain and stress array to make the data on a regular grid
+                        epsf_x = griddata(self._x_arr, epsf_x, x_arr_record)
+                        sigm_x = griddata(self._x_arr, sigm_x, x_arr_record)
+                        #=============================================================================
+                               
+                        epsf_record.append(epsf_x)
+                        sigm_record.append(sigm_x)
+                        sigc_record.append(sigc)
+                        
+                    #=============================================================================
+                    # plot the stress or strain profile under given BC                     
+#                     if L_l == self.BC_range[-1] and L_r == self.BC_range[-1]:
+#                         X, Y = np.meshgrid(x_arr_record, sigc_record)
+#                         fig = plt.figure()
+#                         ax = fig.add_subplot(111, projection='3d')
+#                         ax.plot_wireframe(X, Y, sigm_record, rstride=2, cstride=20)
+                    #=============================================================================
+  
+                    interp_epsf = interp2d(x_arr_record, sigc_record, epsf_record)
+                    interp_sigm = interp2d(x_arr_record, sigc_record, sigm_record)
+                    
+                    print ((j+1)*j/2+q+1)*100/(self.n_BC*(self.n_BC+1)/2), '%'
+                    
+                    interps_epsf.append(interp_epsf)
+                    interps_sigm.append(interp_sigm)
+                    
+        print 'time consumed:', t.clock()-t1
+        return interps_epsf, interps_sigm
+
+    #=============================================================================
+    # functions for evaluation of stress and strain profile 
+    #=============================================================================    
+    def get_index(self, Ll, Lr):
+        # find the index of the interpolator corresponding to the BC
+        l, r = np.sort([Ll, Lr])
+        i = (np.abs(self.BC_range - l)).argmin()
+        j = (np.abs(self.BC_range - r)).argmin()
+        return (j+1)*j/2+i
+    
+    # function for evaluating specimen reinforcement strain    
+    def get_eps_f_z(self, z_arr, Ll_arr, Lr_arr, load):
+        def get_eps_f_i(self, z, Ll, Lr, load):
+            ind = self.get_index(Ll, Lr)
+            f = self.interps[0][ind]
+            return f(z, load)        
+        v = np.vectorize(get_eps_f_i)
+        return v(self, z_arr, Ll_arr, Lr_arr, load)
+
+    # function for evaluating specimen matrix stress       
+    def get_sig_m_z(self, z_arr, Ll_arr, Lr_arr, load):
+        def get_sig_m_i(self, z, Ll, Lr, load):
+            ind = self.get_index(Ll, Lr)
+            f = self.interps[1][ind]
+            return f(z, load)
+        v = np.vectorize(get_sig_m_i)
+        return v(self, z_arr, Ll_arr, Lr_arr, load)
 
 if __name__ == '__main__':
     
-    reinf = FiberBoundle(r=0.0035,
-                      tau=np.array([ 0.48419826,  0.71887589,  0.86655175,  0.98916772,  1.10160428, 1.21166999,  1.32595141,  1.45322794,  1.61204695,  1.89332916]),
-                      tau_weights = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]),
-                      V_f=0.1,
-                      E_f=240e3,
-                      xi=0.035)
+#     reinf = FiberBundle(r=0.0035,
+#                       tau=np.array([ 0.48419826,  0.71887589,  0.86655175,  0.98916772,  1.10160428, 1.21166999,  1.32595141,  1.45322794,  1.61204695,  1.89332916]),
+#                       tau_weights = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]),
+#                       V_f=0.1,
+#                       E_f=240e3,
+#                       xi=0.035)
+
+    from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers, fibers_MC
+    reinf = ContinuousFibers(r=3.5e-3,
+                              tau=RV('weibull_min', loc=0.01, scale=.1, shape=2.),
+                              V_f=0.005,
+                              E_f=200e3,
+                              xi=fibers_MC(m=7., sV0=0.005),
+                              label='carbon',
+                              n_int=500)
+
     
     ccb = RandomBondCB(E_m=25e3,
                          reinforcement_lst=[reinf],
                          Ll=20.,
                          Lr=20.,
-                         w=.3)
+                         n_BC=8)
+    
+    print ccb.BC_range
 
-    ccb.damage
+#     ccb.damage
  
-    print ccb.sorted_xi
-    print ccb._epsf0_arr
+#     print ccb.sorted_xi
+#     print ccb._epsf0_arr
         
-    plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
-    for i, depsf in enumerate(ccb.sorted_depsf):
-        epsf_x = np.maximum(ccb._epsf0_arr[i] - depsf * np.abs(ccb._x_arr), ccb._epsm_arr)
-        # print np.trapz(epsf_x - ccb._epsm_arr, ccb._x_arr)
-        if i == 0:
-            plt.plot(ccb._x_arr, epsf_x, color='black', label='fibers')
-        else:
-            plt.plot(ccb._x_arr, epsf_x, color='black')
-    plt.plot(ccb._x_arr, ccb._epsm_arr, lw=2, color='blue', label='matrix') 
-    plt.legend(loc='best')
-    plt.ylabel('matrix and fiber strain [-]')
-    plt.ylabel('long. position [mm]')
-    plt.show()
+#     plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
+#     for i, depsf in enumerate(ccb.sorted_depsf):
+#         epsf_x = np.maximum(ccb._epsf0_arr[i] - depsf * np.abs(ccb._x_arr), ccb._epsm_arr)
+#         # print np.trapz(epsf_x - ccb._epsm_arr, ccb._x_arr)
+#         if i == 0:
+#             plt.plot(ccb._x_arr, epsf_x, color='black', label='fibers')
+#         else:
+#             plt.plot(ccb._x_arr, epsf_x, color='black')
+#     plt.plot(ccb._x_arr, ccb._epsm_arr, lw=2, color='blue', label='matrix') 
+#     plt.legend(loc='best')
+#     plt.ylabel('matrix and fiber strain [-]')
+#     plt.ylabel('long. position [mm]')
+#     plt.show()
 
 
     
