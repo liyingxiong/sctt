@@ -138,7 +138,7 @@ class RepresentativeCB(HasStrictTraits):
                     self.ccb.Ll = L_l
                     self.ccb.Lr = L_r
 #                     w_max = brute(self.minus_sig_c, ((0, self.w_max),), Ns=100, finish=None)
-                    w_max = fmin(self.minus_sig_c, 0., full_output=0, disp=0)
+                    w_max = self.sigma_c_max()[1]
                     w_arr = np.linspace(np.sqrt(w_max), 1e-15, 20)**2
                     x_arr_record = np.linspace(0, L_r, self.n_Int)
                     epsf_record = []

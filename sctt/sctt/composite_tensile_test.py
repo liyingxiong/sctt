@@ -6,7 +6,6 @@ from scipy.interpolate import interp1d
 from scipy.optimize import brentq, minimize_scalar, fmin, brute
 from random_fields.simple_random_field import SimpleRandomField
 from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.stochastic_cb import StochasticCB
 from crack_bridge_models.representative_cb import RepresentativeCB
 from util.traits.either_type import EitherType
 from etsproxy.traits.ui.api import \
@@ -20,7 +19,8 @@ from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
 from spirrid.rv import RV
 from stats.misc.random_field.random_field_1D import RandomField
 from matplotlib import pyplot as plt
-from crack_bridge_models.random_bond_cb import RandomBondCB, FiberBundle
+from crack_bridge_models.random_bond_cb import RandomBondCB
+from reinforcements.fiber_bundle import FiberBundle
 from calibration import Calibration
 import os.path
 
@@ -30,9 +30,9 @@ class CompositeTensileTest(HasStrictTraits):
     cb = EitherType(klasses=[ConstantBondCB, \
                              RepresentativeCB]) #crack bridge model
 
-#=============================================================================
-# Discretization of the specimen
-#=============================================================================    
+    #=============================================================================
+    # Discretization of the specimen
+    #=============================================================================    
     n_x = Int(501) #number of material points
     L = Float(1000.) #the specimen length - mm
     x = Property(depends_on='n_x, L') #coordinates of the material points
@@ -41,11 +41,11 @@ class CompositeTensileTest(HasStrictTraits):
         return np.linspace(0, self.L, self.n_x)
     sig_mu_x = Array()
 
-#=============================================================================
-# Description of cracked specimen
-#=============================================================================    
+    #=============================================================================
+    # Description of cracked specimen
+    #=============================================================================    
     y = List([]) #the list to record the crack positions
-    z_x = Property(depends_on='x, y')
+    z_x = Property(depends_on='n_x, L, y')
     '''the array containing the distances from each material point to its 
     nearest crack position
     '''
@@ -74,11 +74,26 @@ class CompositeTensileTest(HasStrictTraits):
             return f(self.x)
         except IndexError:
             return np.vstack([np.zeros_like(self.x), np.zeros_like(self.x)])
-        
-#=============================================================================
-# Determine the cracking load level
-#=============================================================================
 
+    #=============================================================================
+    # Strength of the specimen
+    #=============================================================================
+    strength = Property(depends_on='n_x, L, y, cb')
+    '''the strength of the specimen is defined as the minimum of the strength of 
+    all crack bridges'''
+    @cached_property
+    def _get_strength(self):
+        y = np.sort(self.y)
+        d = (y[1:] - y[:-1]) / 2.0
+        L_left = np.hstack([y[0], d])
+        L_right = np.hstack([d, self.L-y[-1]])
+        v = np.vectorize(self.cb.get_index)
+        ind = v(L_left, L_right)
+        return np.amin(self.cb.interps[2][ind])
+
+    #=============================================================================
+    # Determine the cracking load level
+    #=============================================================================
     def get_sig_c_z(self, sig_mu, z, Ll, Lr):
         '''Determine the composite remote stress initiating a crack 
         at position z'''
@@ -86,7 +101,9 @@ class CompositeTensileTest(HasStrictTraits):
         try:
         # search the cracking stress level between zero and ultimate
         # composite stress
-            return brentq(fun, 0, self.cb.sig_cu)
+            ind = self.cb.get_index(Ll, Lr)
+            sig_cu = self.cb.interps[2][ind]
+            return brentq(fun, 0, sig_cu)
         
         except ValueError:
         # solution not found 
@@ -99,7 +116,7 @@ class CompositeTensileTest(HasStrictTraits):
             
             except ValueError:
             # shielded zone, impossible to crack, return the ultimate stress 
-                return self.cb.sig_cu
+                return 1e6
          
     get_sig_c_x_i = np.vectorize(get_sig_c_z)
      
@@ -115,9 +132,9 @@ class CompositeTensileTest(HasStrictTraits):
         sig_c_i = sig_c_x_i[y_idx]
         return sig_c_i, y_i
 
-#=============================================================================
-# determine the crack history
-#=============================================================================
+    #=============================================================================
+    # determine the crack history
+    #=============================================================================
     def get_cracking_history(self):
         '''Trace the response crack by crack.
         '''
@@ -130,15 +147,16 @@ class CompositeTensileTest(HasStrictTraits):
             self.y.append(y_i)
             sig_c_lst.append(sig_c_i)
             z_x_lst.append(np.array(self.z_x))
-            BC_x_lst.append(np.array(self.BC_x))            
-            if sig_c_i == self.cb.sig_cu: break
+            BC_x_lst.append(np.array(self.BC_x))
+            if sig_c_i >= self.strength: break            
+            elif sig_c_i == 1e6: break
         print 'cracking history determined'
         self.y = []
         return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst
 
-#=============================================================================
-# post processing
-#=============================================================================
+    #=============================================================================
+    # post processing
+    #=============================================================================
     def get_eps_c_i(self, sig_c_i, z_x_i, BC_x_i):
         '''For each cracking level calculate the corresponding
         composite strain eps_c.
@@ -193,7 +211,7 @@ class CompositeTensileTest(HasStrictTraits):
         return eps_arr
     
     def get_w_dist(self, sig_c_i, z_x_i, BC_x_i):
-        '''function for evaluate the crack with
+        '''function for evaluate the crack width
         '''
         w_dist = []
         for sig_c, z_x, BC_x in zip(sig_c_i, z_x_i, BC_x_i):
@@ -249,44 +267,45 @@ if __name__ == '__main__':
     #=============================================================================
     # calibration
     #=============================================================================
-    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2    
-    home_dir = 'D:\\Eclipse\\'
-    path = [home_dir, 'git',  # the path of the data file
-            'rostar',
-            'scratch',
-            'diss_figs',
-            'CB1.txt']
-    filepath = os.path.join(*path)
-    exp_data = np.zeros_like(w_arr)
-    file1 = open(filepath, 'r')
-    cb = np.loadtxt(file1, delimiter=';')
-    test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
-    test_ydata = cb[:, 1] / (11. * 0.445) * 1000
-    interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
-    exp_data = interp(w_arr)
-    cali = Calibration(experi_data=exp_data,
-                       w_arr=w_arr,
-                       tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
-    tau_ind = np.nonzero(cali.tau_weights)
+#     w_arr = n
+#     p.linspace(0.0, np.sqrt(8.), 401) ** 2    
+#     home_dir = 'D:\\Eclipse\\'
+#     path = [home_dir, 'git',  # the path of the data file
+#             'rostar',
+#             'scratch',
+#             'diss_figs',
+#             'CB1.txt']
+#     filepath = os.path.join(*path)
+#     exp_data = np.zeros_like(w_arr)
+#     file1 = open(filepath, 'r')
+#     cb = np.loadtxt(file1, delimiter=';')
+#     test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
+#     test_ydata = cb[:, 1] / (11. * 0.445) * 1000
+#     interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
+#     exp_data = interp(w_arr)
+#     cali = Calibration(experi_data=exp_data,
+#                        w_arr=w_arr,
+#                        tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
+#     tau_ind = np.nonzero(cali.tau_weights)
     
     
     
-    reinf = FiberBundle(r=0.0035,
-                  tau=cali.tau_arr[tau_ind],
-                  tau_weights = cali.tau_weights[tau_ind],
-                  V_f=0.1,
-                  E_f=200e3,
-                  xi=fibers_MC(m=cali.m, sV0=cali.sV0))
+#     reinf = FiberBundle(r=0.0035,
+#                   tau=cali.tau_arr[tau_ind],
+#                   tau_weights = cali.tau_weights[tau_ind],
+#                   V_f=0.1,
+#                   E_f=200e3,
+#                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
 
 
     
-#     reinf = ContinuousFibers(r=0.0035,
-#                           tau=RV('weibull_min', loc=0.0, shape=1., scale=1.),
-#                           V_f=0.01,
-#                           E_f=180e3,
-#                           xi=fibers_MC(m=2.0, sV0=0.003),
-#                           label='carbon',
-#                           n_int=200)
+    reinf = ContinuousFibers(r=0.0035,
+                          tau=RV('weibull_min', loc=0.0, shape=1., scale=1.),
+                          V_f=0.01,
+                          E_f=180e3,
+                          xi=fibers_MC(m=2.0, sV0=0.003),
+                          label='carbon',
+                          n_int=200)
      
 #     cb1 = CompositeCrackBridge(E_m=25e3,
 #                                reinforcement_lst=[reinf])
@@ -316,8 +335,7 @@ if __name__ == '__main__':
                                L = 100,
                                cb=rcb,
                                sig_mu_x= random_field.random_field)
-    
-    print np.amin(ctt.sig_mu_x)
+
     
     sig_c_i, z_x_i, BC_x_i = ctt.get_cracking_history()
     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
@@ -330,7 +348,7 @@ if __name__ == '__main__':
     
         
     load_arr = np.linspace(0, ctt.cb.sig_cu, 200)
-    eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
+    eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr) 
     w_dist = ctt.get_w_dist(sig_c_i, z_x_i, BC_x_i)
       
 #     ctt.configure_traits()
