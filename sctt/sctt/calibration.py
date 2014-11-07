@@ -8,13 +8,14 @@ from math import pi
 from scipy.optimize import basinhopping, fmin, fmin_l_bfgs_b, fmin_cobyla, brute, nnls
 from scipy.interpolate import interp1d
 from numpy.linalg import solve, lstsq
-from etsproxy.util.home_directory import get_home_directory
+# from etsproxy.util.home_directory import get_home_directory
 import os.path
-from crack_bridge_models.random_bond_cb import RandomBondCB
+# from crack_bridge_models.random_bond_cb import RandomBondCB
 from reinforcements.fiber_bundle import FiberBundle
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
-
+from scipy.stats import gamma as gam
+# from scipy.interpolate import interp1d
 
 class Calibration(HasTraits):
 
@@ -32,17 +33,24 @@ class Calibration(HasTraits):
     E_f = Float(200e3, auto_set=False, enter_set=True, input=True,
                   distr=['uniform'])
     # shape parameter of the breaking strain distribution
-    m = Float(9., auto_set=False, enter_set=True, input=True,
+    m = Float(7., auto_set=False, enter_set=True, input=True,
                   distr=['uniform'])
     # fiber volume fraction
     V_f = Float(0.01, auto_set=False, enter_set=True, input=True,
               distr=['uniform'])
     # crack width descritization
     w_arr = Array
-    # boundary condition of saturated state
+#     # boundary condition of saturated state
     bc = Float
-    # matrix strength
+#     # matrix strength
     sig_mu = Float
+    # coefficient
+    alpha = Float
+    
+    shape = Float
+    scale = Float
+    loc = Float
+    
     
     #===============================================================================
     # the crack width-fiber stress response
@@ -51,7 +59,7 @@ class Calibration(HasTraits):
         T = 2. * self.tau_arr / self.r
         # scale parameter with respect to a reference volume
         s = ((T * (self.m + 1) * sV0 ** self.m) / (2. * self.E_f * pi * self.r ** 2)) ** (1. / (self.m + 1))
-        ef0 = np.sqrt(self.w_arr[:, np.newaxis] * T[np.newaxis, :] / self.E_f)
+        ef0 = np.sqrt(self.w_arr[:, np.newaxis] * T[np.newaxis, :]  / self.E_f)
         Gxi = 1 - np.exp(-(ef0 / s) ** (self.m + 1))
         mu_int = ef0 * (1 - Gxi)
         I = s * gamma(1 + 1. / (self.m + 1)) * gammainc(1 + 1. / (self.m + 1), (ef0 / s) ** (self.m + 1))
@@ -60,6 +68,37 @@ class Calibration(HasTraits):
         sigma = (mu_int + mu_broken) * self.E_f
         return sigma
 
+    #===============================================================================
+    # the crack width-fiber stress response
+    #===============================================================================
+    def get_damage_portion(self, sV0, w):
+        T = 2. * self.tau_arr / self.r
+        # scale parameter with respect to a reference volume
+        s = ((T * (self.m + 1) * sV0 ** self.m) / (2. * self.E_f * pi * self.r ** 2)) ** (1. / (self.m + 1))
+        ef0 = np.sqrt(self.w_arr[:, np.newaxis] * T[np.newaxis, :] / self.E_f)
+        Gxi = 1 - np.exp(-(ef0 / s) ** (self.m + 1))
+        i = np.sum(self.w_arr<=w)-1
+        return Gxi[i]
+
+    #===============================================================================
+    # the debonding length
+    #===============================================================================
+    def get_debonding_length(self, w):
+        return np.sqrt(0.5*w*self.E_f*self.r/self.tau_arr)
+
+    #===============================================================================
+    # the matrix stress at x from crack position
+    #===============================================================================
+    def matrix_stress(self, x, w):
+        def H(x):
+            return x>0
+        T = 2*self.tau_arr/self.r
+        sig_f0 = np.sqrt(w*self.E_f*T)
+        a = self.get_debonding_length(w)
+        damage = self.get_damage_portion(self.sV0, w)
+        transfered_stress = (sig_f0*H(x-a)+x*T*H(a-x))*damage
+        return transfered_stress*self.V_f*(1-self.V_f)
+        
     #===============================================================================
     # optimization
     #===============================================================================
@@ -79,14 +118,15 @@ class Calibration(HasTraits):
         x, y = nnls(sigma, data)        
         return y
         
-    sV0 = Property(Float, depends_on='r, E_f, m, V_f')
-    '''Value of sV0 minimizing the lack of fit.
-    '''
-    @cached_property
-    def _get_sV0(self):
-        residual = lambda sv0: self.get_lack_of_fit(sv0)
-        sV0 = brute(residual, ((0.0001, 0.01),), Ns=10)
-        return float(sV0)
+#     sV0 = Property(Float, depends_on='r, E_f, m, V_f')
+#     '''Value of sV0 minimizing the lack of fit.
+#     '''
+#     @cached_property
+#     def _get_sV0(self):
+#         residual = lambda sv0: self.get_lack_of_fit(sv0)
+#         sV0 = brute(residual, ((0.0001, 0.01),), Ns=10)
+#         return float(sV0)
+    sV0 = Float
 
     #===========================================================================
     # Postprocessing for calibrated tau distribution  and sv0
@@ -100,11 +140,49 @@ class Calibration(HasTraits):
     tau_weights = Property(Float, depends_on='r, E_f, m, V_f')
     @cached_property
     def _get_tau_weights(self):
-        sigma = self.get_sigma_tau_w(self.sV0)
+        sigma = (1-self.alpha)*self.get_sigma_tau_w(self.sV0)
         sigma[0] = 1e6 * np.ones_like(self.tau_arr)
-        data = np.copy(self.experi_data)
+        
+        damage = self.get_damage_portion(self.sV0, 8.5e-2)
+#         print damage
+#         T = 1e3*2. * self.tau_arr / self.r
+#         sigma = np.vstack((sigma, T)) #constraint for initial slope of matrix stress
+
+#         for x in np.linspace(1, 7, 100):
+#             matrix_stress = self.matrix_stress(x, 4.4e-2)
+#             sigma = np.vstack((sigma, 1e3*matrix_stress))
+        
+
+        rv=gam(self.shape, loc=self.loc, scale=self.scale)
+        gamma_weight = rv.cdf(self.tau_arr) - rv.cdf(np.hstack((0, self.tau_arr[0:-1])))
+        n_factor = np.amax(self.experi_data)/np.amax(gamma_weight)
+
+        diagonal = self.alpha*n_factor*np.eye(len(self.tau_arr))
+        sigma = np.vstack((sigma, diagonal)) #constraint for scatter of tau_weights
+        
+#         tau_sqr = 1e3*self.tau_arr**2
+#         sigma = np.vstack((sigma, tau_sqr))
+        
+        data = (1-self.alpha)*np.copy(self.experi_data)
         data[0] = 1e6
+
+#         data = np.hstack((data, 1e3*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
+
+#         data = np.hstack((data, 1e3*((self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*0.5*self.r)**2+0.2)))
+#         mean_tau = 5e2*np.ones_like(self.tau_arr)*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*self.r*0.5
+
+#         rv=gam(0.22, loc=0.007, scale=0.8)
+#         gamma_weight = rv.cdf(self.tau_arr) - rv.cdf(np.hstack((0, self.tau_arr[0:-1])))
+        
+#         
+#         stress = np.sqrt(np.linspace(1, 7, 100))/np.sqrt(7)*3.5 
+#         data = np.hstack((data, 1e3*stress))
+        
+        data = np.hstack((data, self.alpha*n_factor*gamma_weight))
+
+        
         x, y = nnls(sigma, data)
+        
         return x
 
 if __name__ == '__main__':
@@ -132,23 +210,25 @@ if __name__ == '__main__':
 
 
 #     for m in np.linspace(2., 30., 29):
-    n=0
+    m=4
     sv0_lst = []
-    sig_saturated_max = []
+    sig_saturated_max1 = []
     w_lst = []
-    n_lst = []
+    m_lst = []
     y_lst = []
     sig_bc = []
-    
-    while n<=500:
-
-        n += 10
-        print n
+     
+    while m<=30:
+ 
+        m += 1
+        print m
         cali = Calibration(experi_data=exp_data,
                            w_arr=w_arr,
-                           tau_arr=np.logspace(np.log10(1e-5), np.log10(1), n),
-                           bc=4.03,
-                           sig_mu=3.4
+                           tau_arr=np.logspace(np.log10(1e-4), 0.5, 400),
+                           bc=6.85,
+                           sig_mu=3.4,
+                           sV0 = 0.0045,
+                           m=m
                            )
     
     #===============================================================================
@@ -156,8 +236,11 @@ if __name__ == '__main__':
     #===============================================================================
     
         sV0 = cali.sV0
+        
         sigma = cali.get_sigma_tau_w(sV0)
         sigma_avg = cali.sigma_c
+        
+#         print 'stdv', np.dot(cali.tau_weights, (cali.tau_arr)**2)-(cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)*0.5*cali.r)**2
     
         plt.clf()
         plt.subplot(321)
@@ -168,6 +251,8 @@ if __name__ == '__main__':
     #     plt.text(0.5, 0.5, 'm=' + str(m) + ', sV0=' + str(float(sV0))[:7])
         plt.subplot(322)
         plt.bar(np.log10(cali.tau_arr), cali.tau_weights , width=0.02)
+        tau_e = cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)*0.5*cali.r
+        plt.plot((np.log10(tau_e), np.log10(tau_e)), (0, 1.), '--')
         plt.xlim(-5, 1)
         plt.ylim(0, 1)
     #     plt.plot(cali.tau_arr, x)
@@ -175,7 +260,10 @@ if __name__ == '__main__':
         plt.plot(cali.w_arr, sigma)
         plt.xlim(0, 8)
         plt.ylim(0, 3000)
-
+        print 'mean T:'+str(cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f))
+        print 'weighted sum of T:'+str(np.sum(cali.tau_weights*2*cali.tau_arr/cali.r))
+    
+    
         plt.subplot(324)
         x = cali.tau_weights
         for i, sigmai in enumerate(sigma.T):
@@ -185,64 +273,131 @@ if __name__ == '__main__':
         plt.ylim(0, 3000)
 
         
-        tau_ind = np.nonzero(x)
-        reinf = FiberBundle(r=0.0035,
-                            tau=cali.tau_arr[tau_ind],
-                            tau_weights = x[tau_ind],
-                            V_f=0.015,
-                            E_f=200e3,
-                            xi=fibers_MC(m=cali.m, sV0=float(sV0))
-                            )
-        cb =  RandomBondCB(E_m=25e3,
-                           reinforcement_lst=[reinf],
-                           Ll=4.03,
-                           Lr=4.03)
-        sig_saturated = np.zeros_like(cali.w_arr)
-        for i, w in enumerate(cali.w_arr):
-            sig_saturated[i] = cb.sig_c(w)
-        
-        plt.subplot(325)
-        ind = np.nonzero(sig_saturated)
-        plt.plot(cali.w_arr[ind], sig_saturated[ind])
-        plt.xlim(0, 0.3)
-        plt.ylim(0, 15)
-        
+#         tau_ind = np.nonzero(x)
+#          
+#         reinf1 = FiberBundle(r=0.0035,
+#                             tau=cali.tau_arr[tau_ind],
+#                             tau_weights = x[tau_ind],
+#                             V_f=0.01,
+#                             E_f=200e3,
+#                             xi=fibers_MC(m=cali.m, sV0=float(sV0))
+#                             )
+#         cb1 =  RandomBondCB(E_m=25e3,
+#                            reinforcement_lst=[reinf1],
+#                            Ll=6.85,
+#                            Lr=6.85)
+#  
+#  
+#         reinf2 = FiberBundle(r=0.0035,
+#                             tau=cali.tau_arr[tau_ind],
+#                             tau_weights = x[tau_ind],
+#                             V_f=0.015,
+#                             E_f=200e3,
+#                             xi=fibers_MC(m=cali.m, sV0=float(sV0))
+#                             )
+#         cb2 = RandomBondCB(E_m=25e3,
+#                            reinforcement_lst=[reinf2],
+#                            Ll=4.03,
+#                            Lr=4.03)
+#          
+#         sig_saturated1 = np.zeros_like(cali.w_arr)
+#         sig_saturated2 = np.zeros_like(cali.w_arr)
+#         for i, w in enumerate(cali.w_arr):
+#             sig_saturated1[i] = cb1.sig_c(w)
+#             sig_saturated2[i] = cb2.sig_c(w)
+#          
+#         plt.subplot(325)
+#         ind = np.nonzero(sig_saturated2)
+#         plt.plot(cali.w_arr[ind], sig_saturated1[ind]/0.01, label='0.01')
+#         plt.plot(cali.w_arr[ind], sig_saturated2[ind]/0.015, label='0.015')
+#         plt.legend()
+#         plt.xlim(0, 0.3)
+#         plt.ylim(0, 3000)
+         
 #         plt.show()
-        
-
+         
+ 
 #         savepath = 'D:\\parametric study\\cb_1\\m='+str(m)+' sV0='+str(float(sV0))[:7]+'.png'
         sv0_lst.append(sV0)
-        max_ind = np.argmax(sig_saturated)
-        sig_saturated_max.append(sig_saturated[max_ind])
-        w_lst.append(cali.w_arr[max_ind])
-        n_lst.append(n)
+#         max_ind = np.argmax(sig_saturated)
+#         sig_saturated_max.append(sig_saturated[max_ind])
+#         w_lst.append(cali.w_arr[max_ind])
+        m_lst.append(m)
         y_lst.append(cali.get_lack_of_fit(sV0))
-        
-        plt.subplot(326)
-        cb.w = cali.w_arr[max_ind]
-        cb.Ll = 1e5
-        cb.Lr = 1e5
-        cb.damage
-        plt.plot(cb._x_arr, cb.E_m*cb._epsm_arr)
-        plt.xlim(0, 200)
-        plt.ylim(0, 6.)
-        sig_bc.append(cb.E_m*cb._epsm_arr[-1])
-        
-        savepath = 'D:\\parametric study\\number of tau\\n='+str(n)+'.png'
+         
+         
+         
+         
+#         cb1.Ll = 250
+#         cb1.Lr = 250
+#          
+#         cb2.Ll = 250
+#         cb2.Lr = 250
+#          
+#         sig_interp1 = np.zeros_like(cali.w_arr)
+#         sig_interp2 = np.zeros_like(cali.w_arr)
+#          
+#         for i, w in enumerate(cali.w_arr):
+#             sig_interp1[i] = cb1.sig_c(w)
+#             sig_interp2[i] = cb2.sig_c(w)
+#  
+#  
+#  
+#          
+#  
+#          
+#          
+#          
+#         plt.subplot(326)
+#         ind1 = np.argmax(sig_interp1[1:])
+#         f1 = interp1d(sig_interp1[1:ind1], cali.w_arr[1:ind1])
+#          
+#         ind2 = np.argmax(sig_interp2[1:])
+#         f2 = interp1d(sig_interp2[1:ind2], cali.w_arr[1:ind2])
+#          
+#         cb1.w = float(f1(5))
+#         print cb1.w
+#         cb1.damage
+         
+#         cb2.w = float(f2(5))
+#         print cb2.w
+#         cb2.damage
+#  
+#         plt.plot(cb1._x_arr, cb1.E_m*cb1._epsm_arr, label='1@5')
+#         plt.plot(cb2._x_arr, cb2.E_m*cb2._epsm_arr, label='1.5@5')
+         
+#         cb1.w = float(f1(10))
+#         print cb1.w
+#         cb1.damage
+#          
+#         cb2.w = float(f2(10))
+#         print cb2.w
+#         cb2.damage
+#  
+#         plt.plot(cb1._x_arr, cb1.E_m*cb1._epsm_arr, label='1@10')
+#         plt.plot(cb2._x_arr, cb2.E_m*cb2._epsm_arr, label='15@10')
+ 
+#         plt.legend()
+#         plt.xlim(0, 200)
+#         plt.ylim(0, 10.)
+#         sig_bc.append(cb.E_m*cb._epsm_arr[-1])
+         
+        savepath = 'D:\\parametric study\\number of tau\\m='+str(m)+'.png'
         plt.savefig(savepath)
-
-
-    
+ 
+ 
+     
     plt.clf()
     plt.subplot(221)
-    plt.plot(n_lst, sv0_lst)
+    plt.plot(m_lst, sv0_lst)
     plt.subplot(222)
-    plt.plot(n_lst, sig_saturated_max)
+#     plt.plot(m_lst, sig_saturated_max)
     plt.subplot(223)
-    plt.plot(n_lst, y_lst)
+    plt.plot(m_lst, y_lst)
     plt.subplot(224)
-    plt.plot(n_lst, w_lst)
+    plt.plot(m_lst, w_lst)
     plt.show()
+
 
 
 

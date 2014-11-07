@@ -8,13 +8,15 @@ from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement import 
     ContinuousFibers
 from reinforcements.fiber_bundle import FiberBundle
 import numpy as np
-from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg
+from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg, fsolve, \
+    broyden2, broyden1, newton_krylov, basinhopping, minimize_scalar
 from scipy.integrate import cumtrapz
 import time as t
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d, interp2d, griddata, LinearNDInterpolator
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 
-        
 class RandomBondCB(HasTraits):
     
     #===============================================================================
@@ -113,7 +115,7 @@ class RandomBondCB(HasTraits):
     @cached_property
     def _get_sorted_nu_r(self):
         return self.sorted_theta[5]
-
+    
     sorted_masks = Property(depends_on='reinforcement_lst+')
     @cached_property
     def _get_sorted_masks(self):
@@ -128,12 +130,10 @@ class RandomBondCB(HasTraits):
     @cached_property
     def _get_sorted_xi_cdf(self):
         '''breaking strain: CDF for random and Heaviside for discrete values'''
-#         TODO: does not work for reinforcement types with the same xi: line 156
+#         TODO: does not work for reinforcement types with the same xi: line 135
         methods = []
         masks = [] 
         for reinf in self.reinforcement_lst:
-#             print self.sorted_xi
-#             print reinf.xi
             masks.append(self.sorted_xi == reinf.xi)
             if isinstance(reinf.xi, FloatType):
                 methods.append(lambda x: 1.0 * (reinf.xi <= x))
@@ -151,46 +151,52 @@ class RandomBondCB(HasTraits):
         return self.sorted_V_f * self.sorted_nu_r * \
                 self.sorted_stats_weights * self.sorted_E_f
 
-
     #===============================================================================
     # evaluate maximum fiber strain and matrix strain profile 
     #===============================================================================        
     def dem_depsf_vect(self, damage):
         '''evaluates the deps_m given deps_f at that point and the damage array
-        Eq.(4.17)
+        Eq.(4.17), return the array containing the matrix strain  derivative at
+        each point z_i
         '''
         Kf_intact = self.Kf * (1. - damage)
         Kf_intact_bonded = np.hstack((0.0, np.cumsum((Kf_intact))))[:-1]
         Kf_broken = np.sum(self.Kf - Kf_intact)
         Kf_add = Kf_intact_bonded + Kf_broken
         Km = (1. - self.V_f_tot) * self.E_m
-        E_mtrx = Km + Kf_add
+        E_mtrx = Km + Kf_add #Eq.(4.15)
         mu_T = np.cumsum((self.sorted_depsf * Kf_intact)[::-1])[::-1]
         return mu_T / E_mtrx
-        
+            
     def F(self, dems, amin):
-        '''Auxiliary function (see Part II, appendix B), Eq.(D.21) and Eq.(D.35)
-        '''
-        F = np.zeros_like(self.sorted_depsf)
-        for i, mask in enumerate(self.sorted_masks):
-            depsfi = self.sorted_depsf[mask]
-            demsi = dems[mask]
-            fi = 1. / (depsfi + demsi)
-            F[mask] = np.hstack((np.array([0.0]), cumtrapz(fi, -depsfi)))
-            if i == 0:
-                C = 0.0
-            else:
-                depsf0 = self.sorted_depsf[self.sorted_masks[i - 1]]
-                depsf1 = depsfi[0]
-                idx = np.sum(depsf0 > depsf1) - 1
-                depsf2 = depsf0[idx]
-                a1 = np.exp(F[self.sorted_masks[i - 1]][idx] / 2. + np.log(amin))
-                p = depsf2 - depsf1
-                q = depsf1 + demsi[0]
-                amin_i = np.sqrt(a1 ** 2 + p / q * a1 ** 2)
-                C = np.log(amin_i / amin)
-            F[mask] += 2 * C
+        '''Eq.(D.21)'''
+        f = 1. / (self.sorted_depsf + dems)
+        F = np.hstack((0., cumtrapz(f, -self.sorted_depsf)))
         return F
+
+#     def F(self, dems, amin):
+#         '''Auxiliary function (see Part II, appendix B)
+#         '''
+#         F = np.zeros_like(self.sorted_depsf)
+#         for i, mask in enumerate(self.sorted_masks):
+#             depsfi = self.sorted_depsf[mask]
+#             demsi = dems[mask]
+#             fi = 1. / (depsfi + demsi)
+#             F[mask] = np.hstack((np.array([0.0]), cumtrapz(fi, -depsfi)))
+#             if i == 0:
+#                 C = 0.0
+#             else:
+#                 depsf0 = self.sorted_depsf[self.sorted_masks[i - 1]]
+#                 depsf1 = depsfi[0]
+#                 idx = np.sum(depsf0 > depsf1) - 1
+#                 depsf2 = depsf0[idx]
+#                 a1 = np.exp(F[self.sorted_masks[i - 1]][idx] / 2. + np.log(amin))
+#                 p = depsf2 - depsf1
+#                 q = depsf1 + demsi[0]
+#                 amin_i = np.sqrt(a1 ** 2 + p / q * a1 ** 2)
+#                 C = np.log(amin_i / amin)
+#             F[mask] += 2 * C
+#         return F
     
     def clamped(self, Lmin, Lmax, init_dem):
         '''maximum fiber strain and matrix strain profile for clamped fiber
@@ -222,21 +228,19 @@ class RandomBondCB(HasTraits):
         # initial matrix strain derivative
         init_dem = dems[0]
         # debonded length of fibers with Tmax
-        amin = (self.w / (np.abs(init_dem) + np.abs(self.sorted_depsf[0]))) ** 0.5
+        amin = np.sqrt(self.w / (np.abs(init_dem) + np.abs(self.sorted_depsf[0])))
         # integrated f(depsf) - see article
         F = self.F(dems, amin)
         # a1 is a(depsf) for double sided pullout
         a1 = amin * np.exp(F / 2.)
-        aX = np.exp((-np.log(np.abs(self.sorted_depsf) + dems) + np.log(self.w)) / 2.)
+#         aX = np.exp((-np.log(np.abs(self.sorted_depsf) + dems) + np.log(self.w)) / 2.)
         if Lmin < a1[0] and Lmax < a1[0]:
             # all fibers debonded up to Lmin and Lmax
             a, em, epsf0 = self.clamped(Lmin, Lmax, init_dem)
 
         elif Lmin < a1[0] and Lmax >= a1[0]:
             # all fibers debonded up to Lmin but not up to Lmax
-            amin = -Lmin + np.sqrt(2 * Lmin ** 2 + 2 * self.w / (self.sorted_depsf[0] + init_dem))
-            C = np.log(amin ** 2 + 2 * Lmin * amin - Lmin ** 2)
-            a2 = np.sqrt(2 * Lmin ** 2 + np.exp((F + C))) - Lmin
+            a2 = np.sqrt(2 * Lmin ** 2 + np.exp(F)* 2 * self.w / (self.sorted_depsf[0] + init_dem)) - Lmin
             if Lmax < a2[0]:
                 a, em, epsf0 = self.clamped(Lmin, Lmax, init_dem)
             else:
@@ -259,16 +263,17 @@ class RandomBondCB(HasTraits):
             # boundary condition position
             idx1 = np.sum(a1 <= Lmin)
             # a(T) for one sided pullout
-            # first debonded length amin for one sided PO
-            depsfLmin = self.sorted_depsf[idx1]
-            p = (depsfLmin + dems[idx1])
-            a_short = np.hstack((a1[:idx1], Lmin))
-            em_short = np.cumsum(np.diff(np.hstack((0.0, a_short))) * dems[:idx1 + 1])
-            emLmin = em_short[-1]
-            umLmin = np.trapz(np.hstack((0.0, em_short)), np.hstack((0.0, a_short)))
-            amin = -Lmin + np.sqrt(4 * Lmin ** 2 * p ** 2 - 4 * p * emLmin * Lmin + 4 * p * umLmin - 2 * p * Lmin ** 2 * depsfLmin + 2 * p * self.w) / p
-            C = np.log(amin ** 2 + 2 * amin * Lmin - Lmin ** 2)
-            a2 = (np.sqrt(2 * Lmin ** 2 + np.exp(F + C - F[idx1])) - Lmin)[idx1:]
+            # first debonded length amin for one sided pull out
+#             depsfLmin = self.sorted_depsf[idx1]
+#             p = (depsfLmin + dems[idx1])
+#             a_short = np.hstack((a1[:idx1], Lmin))
+#             em_short = np.cumsum(np.diff(np.hstack((0.0, a_short))) * dems[:idx1 + 1]) 
+#             emLmin = em_short[-1]
+#             umLmin = np.trapz(np.hstack((0.0, em_short)), np.hstack((0.0, a_short)))
+#             amin = -Lmin + np.sqrt(4 * Lmin ** 2 * p ** 2 - 4 * p * emLmin * Lmin + 4 * p * umLmin - 2 * p * Lmin ** 2 * depsfLmin + 2 * p * self.w) / p
+#             C = np.log(amin ** 2 + 2 * amin * Lmin - Lmin ** 2)
+#             a2 = (np.sqrt(2 * Lmin ** 2 + np.exp(F + C - F[idx1])) - Lmin)[idx1:]
+            a2 = np.sqrt(2 * Lmin ** 2 + np.exp(F[idx1:])*2*self.w/(self.sorted_depsf[0] + init_dem))-Lmin
             # matrix strain profiles - shorter side
             a_short = np.hstack((-Lmin, -a1[:idx1][::-1], 0.0))
             dems_short = np.hstack((dems[:idx1], dems[idx1]))
@@ -349,277 +354,315 @@ class RandomBondCB(HasTraits):
     @cached_property
     def _get_damage(self):
         if self.w == 0.:
-            damage = np.zeros_like(self.sorted_depsf)
+            return np.zeros_like(self.sorted_depsf)
         else:
-            try:
-                damage = root(self.damage_residuum, np.ones_like(self.sorted_depsf) * 0.2,
-                              method='excitingmixing', options={'maxiter':100})
-                if np.any(damage.x < 0.0) or np.any(damage.x > 1.0):
-                    raise ValueError
-                damage = damage.x
-            except:
-                print 'fast opt method does not converge: switched to a slower, robust method for this step'
-                damage = root(self.damage_residuum, np.ones_like(self.sorted_depsf) * 0.2,
-                              method='hybr')
-                damage = damage.x
-        return damage
-    
-    def sig_c(self, w): #for evaluation of maximum w
+            damage = root(self.damage_residuum, np.ones_like(self.sorted_depsf) * 0.2,
+                              method='excitingmixing', options={'maxiter':200})
+            if np.any(damage.x < 0.0) or np.any(damage.x > 1+1e-3):
+                raise ValueError
+            return damage.x
+            
+    #===============================================================================
+    # composite stress at crack position as a function of crack width w
+    #===============================================================================
+    def sig_c(self, w):
         self.w = float(w)
         self.damage
-        sig_c = np.sum(self._epsf0_arr \
-                       *self.sorted_stats_weights \
+        sig_c = np.sum(self._epsf0_arr*self.sorted_stats_weights \
                        *self.sorted_V_f*self.sorted_nu_r \
                        *self.sorted_E_f*(1. - self.damage))
         return sig_c
-
+     
+    def minus_sig_c(self, w):
+        self.w = float(w)
+        self.damage
+        sig_c = np.sum(self._epsf0_arr*self.sorted_stats_weights \
+               *self.sorted_V_f*self.sorted_nu_r \
+               *self.sorted_E_f*(1. - self.damage))
+        return -sig_c
+    #===============================================================================
+    # maximize sig_c and return the corresponding crack width w_max for given Ll, Lr
+    #===============================================================================
+    def max_sig_c(self, Ll, Lr): #need further improvement
+        self.Ll = Ll
+        self.Lr = Lr
+        minus_sig_c = lambda w: -self.sig_c(w)
+        w_upper_bound = min(0.1*(self.Ll+self.Lr), 20)
+        # determine the bound for fminbound
+        mid = brute(minus_sig_c, ((0, w_upper_bound),), Ns=10, \
+                          finish=None)
+        results = fminbound(minus_sig_c, max(0, mid-0.1*w_upper_bound), \
+                            mid+0.1*w_upper_bound, \
+                            maxfun=50, full_output=1, disp=0)
+        max_w = results[0]
+        max_sig_c = -results[1]
+        return max_sig_c, max_w
     
-#     #===============================================================================
-#     # composite stress at crack position as a function of crack width w
-#     #===============================================================================
-#     def sig_c(self, w):
-#         self.w = float(w)
-#         self.damage
-#         sig_c = np.sum(self._epsf0_arr*self.sorted_stats_weights \
-#                        *self.sorted_V_f*self.sorted_nu_r \
-#                        *self.sorted_E_f*(1. - self.damage))
-#         return sig_c
-#     
-#     #===============================================================================
-#     # maximum sig_c and the corresponding crack width w_max
-#     #===============================================================================
-#     def sig_c_max(self):
-#         def minfunc_sig_c(w):
-#             self.w = float(w)
-#             self.damage
-#             stiffness_loss = np.sum(self.Kf * self.damage) / np.sum(self.Kf)
-#             if stiffness_loss > 0.90:
-#                 return 1. + w
-#             return -self.sig_c(w)
-#         
-#         def residuum_stiffness(w):
-#             self.w = w
-#             self.damage
-#             stiffness_loss = np.sum(self.Kf * self.damage) / np.sum(self.Kf)
-#             if stiffness_loss > 0.90:
-#                 return 1. + w
-#             if stiffness_loss < 0.65 and stiffness_loss > 0.45:
-#                 residuum = 0.0
-#             else:
-#                 residuum = stiffness_loss - 0.5
-#             return residuum        
-#         
-#         w_max = brentq(residuum_stiffness, 0.0, min(0.1 * (self.Ll + self.Lr), 20.))
-#         w_points = np.linspace(0, w_max, 7)
-#         w_maxima = []
-#         sigma_maxima = []
-#         for i, w in enumerate(w_points[1:]):
-#             w_max = fminbound(minfunc_sig_c, w_points[i], w_points[i + 1], maxfun=5, disp=0)
-#             w_maxima.append(w_max)
-#             sigma_maxima.append(self.sig_c(w_max))
-#         return sigma_maxima[np.argmax(np.array(sigma_maxima))], w_maxima[np.argmax(np.array(sigma_maxima))]
+    #===============================================================================
+    # interpolation parameters
+    #===============================================================================  
+    n_BC = Int(8) #number of different boundary conditions in the interpolator
+    L_max = Float #maximum debonded length, equals to the specimen length
+     
+    n_Int = Property(depends_on='reinforcement_lst')
+    @cached_property
+    def _get_n_Int(self):
+        n_Int = 0
+        for reinf in self.reinforcement_lst:
+            n_Int += reinf.n_int
+        return n_Int
 # 
-#     #===============================================================================
-#     # interpolation parameters
-#     #===============================================================================  
-#     n_BC = Int(8) #number of different boundary conditions in the interpolator
+    #===============================================================================
+    # discretization of the boundary condition
+    #===============================================================================
+    BC_range = Property(depends_on = 'reinforcement_lst+, E_m')
+    @cached_property
+    def _get_BC_range(self):
+        self.w = self.max_sig_c(1e5, 1e5)[1]
+        self.damage
+        L_max = min(self._x_arr[-2], self.L_max) #maximum debonding length
+        BC_range = np.logspace(np.log10(0.02*L_max), np.log10(L_max), self.n_BC)
+        return BC_range
 #     
-#     n_Int = Property(depends_on='reinforcement_lst')
-#     @cached_property
-#     def _get_n_Int(self):
-#         n_Int = 0
-#         for reinf in self.reinforcement_lst:
-#             n_Int += reinf.n_int
-#         return n_Int
+    #=============================================================================
+    # prepare the interpolator for each Boundary Condition
+    #=============================================================================    
+    interps = Property(denpends_on='reinforcement_lst+, Ll, Lr, n_BC, E_m')
+    @cached_property
+    def _get_interps(self):
+        interps_sigm = []
+        interps_epsf = []
+        sig_max_lst = []
+        t1 = t.clock()
+        print 'preparing the interpolators:'
+        for j, L_r in enumerate(self.BC_range):
+            for q, L_l in enumerate(self.BC_range):
+                if L_l <= L_r:
+                    sigma_max, w_max = self.max_sig_c(L_l, L_r)
+                    
+                    # w is discretized in such a way that the corresponding sig_c 
+                    # are more evenly distributed
+                    w_arr = np.linspace(1e-15, np.sqrt(w_max), 20)**2
+                    # a uniform x coordinates for interpolation 
+                    x_arr_record = np.linspace(0, L_r, self.n_Int)
+      
+                    epsf_record = []
+                    sigm_record = []
+                    sigc_record = []
+                     
+                    for w in w_arr:
+                        self.w = w
+                        self.damage
+                                                                         
+                        epsf_x = np.zeros_like(self._x_arr)
+                        for i, depsf in enumerate(self.sorted_depsf):
+                            epsf_x += np.maximum(self._epsf0_arr[i] - \
+                                depsf * np.abs(self._x_arr), \
+                                self._epsm_arr)*self.sorted_stats_weights[i]
+                                 
+                        sigm_x = self._epsm_arr*self.E_m
+                             
+                        sigc = np.sum(self._epsf0_arr*self.sorted_stats_weights \
+                                    *self.sorted_V_f*self.sorted_nu_r \
+                                    *self.sorted_E_f*(1. - self.damage))
+                         
+                        #=============================================================================
+                        # reshape the strain and stress array to make the data on a regular grid
+                        epsf_x = griddata(self._x_arr, epsf_x, x_arr_record)
+                        sigm_x = griddata(self._x_arr, sigm_x, x_arr_record)
+                        #=============================================================================
+                                
+                        epsf_record.append(epsf_x)
+                        sigm_record.append(sigm_x)
+                        sigc_record.append(sigc)
+                    
+                    #=============================================================================
+                    # plot the stress or strain profile under given BC                     
+#                     if L_l == self.BC_range[-1] and L_r == self.BC_range[-1]:
+#                     plt.figure()
+#                     X, Y = np.meshgrid(x_arr_record, sigc_record)
+#                     fig = plt.figure()
+#                     ax = fig.add_subplot(111, projection='3d')
+#                     ax.plot_wireframe(X, Y, sigm_record, rstride=1, cstride=1)
+                    #=============================================================================
+   
+                    interp_epsf = interp2d(x_arr_record, sigc_record, epsf_record)
+                    interp_sigm = interp2d(x_arr_record, sigc_record, sigm_record)
+                     
+                    print ((j+1)*j/2+q+1)*100/(self.n_BC*(self.n_BC+1)/2), '%'
+                     
+                    interps_epsf.append(interp_epsf)
+                    interps_sigm.append(interp_sigm)
+                    sig_max_lst.append(sigma_max)
+                     
+        print 'time consumed:', t.clock()-t1
+        return interps_epsf, interps_sigm, np.array(sig_max_lst)
 # 
-#     #===============================================================================
-#     # discretization of the boundary condition
-#     #===============================================================================
-#     BC_range = Property(depends_on = 'reinforcement_lst+, E_m')
-#     @cached_property
-#     def _get_BC_range(self):
-#         self.Lr, self.Ll = 1e5, 1e5
-#         self.w = self.sig_c_max()[1]
-#         self.damage
-#         L_max = self._x_arr[-2] #maximum debonding length
-#         BC_range = np.logspace(np.log10(0.02*L_max), np.log10(L_max), self.n_BC)
-#         return BC_range
-#     
-#     #=============================================================================
-#     # prepare the interpolator for each Boundary Condition
-#     #=============================================================================    
-#     interps = Property(denpends_on='reinforcement_lst+, Ll, Lr, n_BC, E_m')
-#     @cached_property
-#     def _get_interps(self):
-#         interps_sigm = []
-#         interps_epsf = []
-#         sig_max_lst = []
-#         t1 = t.clock()
-#         print 'preparing the interpolators:'
-#         for j, L_r in enumerate(self.BC_range):
-#             for q, L_l in enumerate(self.BC_range):
-#                 if L_l <= L_r:
-#                     self.Ll = L_l
-#                     self.Lr = L_r
-#                     sigma_max, w_max = self.sig_c_max()
-#                     # w is discretized in such a way that the corresponding sig_c 
-#                     # are more evenly distributed
-#                     w_arr = np.linspace(np.sqrt(w_max), 1e-15, 20)**2
-#                     # a uniform x coordinates for interpolation 
-#                     x_arr_record = np.linspace(0, L_r, self.n_Int)
-#      
-#                     epsf_record = []
-#                     sigm_record = []
-#                     sigc_record = []
-#                     
-#                     for w in w_arr:
-#                         self.w = w
-#                         self.damage
-#                                                                         
-#                         epsf_x = np.zeros_like(self._x_arr)
-#                         for i, depsf in enumerate(self.sorted_depsf):
-#                             epsf_x += np.maximum(self._epsf0_arr[i] - \
-#                                 depsf * np.abs(self._x_arr), \
-#                                 self._epsm_arr)*self.sorted_stats_weights[i]
-#                                 
-#                         sigm_x = self._epsm_arr*self.E_m
-#                             
-#                         sigc = np.sum(self._epsf0_arr*self.sorted_stats_weights \
-#                                     *self.sorted_V_f*self.sorted_nu_r \
-#                                     *self.sorted_E_f*(1. - self.damage))
-#                         
-#                         #=============================================================================
-#                         # reshape the strain and stress array to make the data on a regular grid
-#                         epsf_x = griddata(self._x_arr, epsf_x, x_arr_record)
-#                         sigm_x = griddata(self._x_arr, sigm_x, x_arr_record)
-#                         #=============================================================================
-#                                
-#                         epsf_record.append(epsf_x)
-#                         sigm_record.append(sigm_x)
-#                         sigc_record.append(sigc)
-#                         
-#                     #=============================================================================
-#                     # plot the stress or strain profile under given BC                     
-# #                     if L_l == self.BC_range[-1] and L_r == self.BC_range[-1]:
-# #                         X, Y = np.meshgrid(x_arr_record, sigc_record)
-# #                         fig = plt.figure()
-# #                         ax = fig.add_subplot(111, projection='3d')
-# #                         ax.plot_wireframe(X, Y, sigm_record, rstride=2, cstride=20)
-#                     #=============================================================================
-#   
-#                     interp_epsf = interp2d(x_arr_record, sigc_record, epsf_record)
-#                     interp_sigm = interp2d(x_arr_record, sigc_record, sigm_record)
-#                     
-#                     print ((j+1)*j/2+q+1)*100/(self.n_BC*(self.n_BC+1)/2), '%'
-#                     
-#                     interps_epsf.append(interp_epsf)
-#                     interps_sigm.append(interp_sigm)
-#                     sig_max_lst.append(sigma_max)
-#                     
-#         print 'time consumed:', t.clock()-t1
-#         return interps_epsf, interps_sigm, sig_max_lst
-# 
-#     #=============================================================================
-#     # functions for evaluation of stress and strain profile 
-#     #=============================================================================    
-#     def get_index(self, Ll, Lr):
-#         # find the index of the interpolator corresponding to the BC
-#         l, r = np.sort([Ll, Lr])
-#         i = (np.abs(self.BC_range - l)).argmin()
-#         j = (np.abs(self.BC_range - r)).argmin()
-#         return (j+1)*j/2+i
-#     
-#     # function for evaluating specimen reinforcement strain    
-#     def get_eps_f_z(self, z_arr, Ll_arr, Lr_arr, load):
-#         def get_eps_f_i(self, z, Ll, Lr, load):
-#             ind = self.get_index(Ll, Lr)
-#             f = self.interps[0][ind]
-#             return f(z, load)        
-#         v = np.vectorize(get_eps_f_i)
-#         return v(self, z_arr, Ll_arr, Lr_arr, load)
-# 
-#     # function for evaluating specimen matrix stress       
-#     def get_sig_m_z(self, z_arr, Ll_arr, Lr_arr, load):
-#         def get_sig_m_i(self, z, Ll, Lr, load):
-#             ind = self.get_index(Ll, Lr)
-#             f = self.interps[1][ind]
-#             return f(z, load)
-#         v = np.vectorize(get_sig_m_i)
-#         return v(self, z_arr, Ll_arr, Lr_arr, load)
+    #=============================================================================
+    # functions for evaluation of stress and strain profile 
+    #=============================================================================    
+    def get_index(self, Ll, Lr):
+        # find the index of the interpolator corresponding to the BC
+        l, r = np.sort([Ll, Lr])
+        i = min(np.sum(self.BC_range - l < 0), self.n_BC-1)
+        j = min(np.sum(self.BC_range - r < 0), self.n_BC-1)
+        return (j+1)*j/2+i
+     
+    # function for evaluating specimen reinforcement strain    
+    def get_eps_f_z(self, z_arr, Ll_arr, Lr_arr, load):
+        def get_eps_f_i(self, z, Ll, Lr, load):
+            ind = self.get_index(Ll, Lr)
+            f = self.interps[0][ind]
+            return f(z, load)        
+        v = np.vectorize(get_eps_f_i)
+        return v(self, z_arr, Ll_arr, Lr_arr, load)
+ 
+    # function for evaluating specimen matrix stress       
+    def get_sig_m_z(self, z_arr, Ll_arr, Lr_arr, load):
+        def get_sig_m_i(self, z, Ll, Lr, load):
+            ind = self.get_index(Ll, Lr)
+            f = self.interps[1][ind]
+            return f(z, load)
+        v = np.vectorize(get_sig_m_i)
+        return v(self, z_arr, Ll_arr, Lr_arr, load)
 
 if __name__ == '__main__':
     
-    reinf = FiberBundle(r=0.0035,
-                      tau=np.array([ 0.48419826,  0.71887589,  0.86655175,  0.98916772,  1.10160428, 1.21166999,  1.32595141,  1.45322794,  1.61204695,  1.89332916]),
-                      tau_weights = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]),
-                      V_f=0.1,
-                      E_f=240e3,
-                      xi=0.035)
-#     from calibration import Calibration
-#     import os.path
-#     from stats.pdistrib.weibull_fibers_composite_distr import \
-#         WeibullFibers, fibers_MC
-# 
-#     
-#     w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2    
-#     home_dir = 'D:\\Eclipse\\'
-#     path = [home_dir, 'git',  # the path of the data file
-#             'rostar',
-#             'scratch',
-#             'diss_figs',
-#             'CB1.txt']
-#     filepath = os.path.join(*path)
-#     exp_data = np.zeros_like(w_arr)
-#     file1 = open(filepath, 'r')
-#     cb = np.loadtxt(file1, delimiter=';')
-#     test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
-#     test_ydata = cb[:, 1] / (11. * 0.445) * 1000
-#     interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
-#     exp_data = interp(w_arr)
-#     cali = Calibration(experi_data=exp_data,
-#                        w_arr=w_arr,
-#                        tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
-#     tau_ind = np.nonzero(cali.tau_weights)
-#     
 #     reinf = FiberBundle(r=0.0035,
-#                   tau=cali.tau_arr[tau_ind],
-#                   tau_weights = cali.tau_weights[tau_ind],
-#                   V_f=0.01,
-#                   E_f=200e3,
-#                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
+#                       tau=np.array([ 0.48419826,  0.71887589,  0.86655175,  0.98916772,  1.10160428, 1.21166999,  1.32595141,  1.45322794,  1.61204695,  1.89332916]),
+#                       tau_weights = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]),
+#                       V_f=0.1,
+#                       E_f=240e3,
+#                       xi=0.035)
+    from calibration import Calibration
+    import os.path
+    from stats.pdistrib.weibull_fibers_composite_distr import \
+        WeibullFibers, fibers_MC
+  
+    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2    
+    home_dir = 'D:\\Eclipse\\'
+    path = [home_dir, 'git',  # the path of the data file
+            'rostar',
+            'scratch',
+            'diss_figs',
+            'CB1.txt']
+    filepath = os.path.join(*path)
+    exp_data = np.zeros_like(w_arr)
+    file1 = open(filepath, 'r')
+    cb = np.loadtxt(file1, delimiter=';')
+    test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
+    test_ydata = cb[:, 1] / (11. * 0.445) * 1000
+    interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
+    exp_data = interp(w_arr)
+    cali = Calibration(experi_data=exp_data,
+                       w_arr=w_arr,
+                       tau_arr=np.logspace(np.log10(1e-5), 0.5, 100),
+                       bc=6.85,
+                       sig_mu=3.4,
+                       m = 9,
+                       sV0=0.0045)
+    
+#     plt.figure()
+#     plt.bar(cali.tau_arr, cali.tau_weights , width=0.02)
 
+    
+    
+#     tau_ind = np.nonzero(cali.tau_weights)
+    
+    from pmf_to_rv import PMFtoRV
+    rv = PMFtoRV(sample_points=cali.tau_arr,
+                 weights=cali.tau_weights)
+    
+    
+    
+    reinf1 = FiberBundle(r=0.0035,
+                  tau=cali.tau_arr,
+                  tau_weights = cali.tau_weights,
+                  V_f=0.01,
+                  E_f=200e3,
+                  xi=fibers_MC(m=cali.m, sV0=cali.sV0))
 
-
-
-
-    from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers, fibers_MC
-#     reinf = ContinuousFibers(r=3.5e-3,
-#                               tau=RV('weibull_min', loc=0.01, scale=.1, shape=2.),
-#                               V_f=0.005,
-#                               E_f=200e3,
-#                               xi=fibers_MC(m=7., sV0=0.005),
-#                               label='carbon',
-#                               n_int=200)
-
-#     ccb = RandomBondCB(E_m=25e3,
-#                          reinforcement_lst=[reinf],
-#                          n_BC=8)
-    reinf1 = ContinuousFibers(r=3.5e-3,
-                              tau=RV('weibull_min', loc=0.01, scale=.1, shape=2.),
+    reinf = ContinuousFibers(r=3.5e-3,
+                              tau=RV('weibull_min', loc=0.03, scale=.1, shape=2.),
                               V_f=0.005,
                               E_f=200e3,
-                              xi=fibers_MC(m=7., sV0=0.005),
+                              xi=fibers_MC(m=8., sV0=0.005),
                               label='carbon',
-                              n_int=200)
+                              n_int=50)
 
+        
     ccb = RandomBondCB(E_m=25e3,
-                                 reinforcement_lst=[reinf],
-                                 Ll=1e5,
-                                 Lr=1e5,
-                                 w=0.392516512956)
+                       reinforcement_lst=[reinf],
+                       Ll=5.14349827642,
+                       Lr=8.99432547615,
+                       w=0.0088,
+                       L_max = 100)
     
     
-    print ccb.sig_c(0.1)
+
+    print ccb.BC_range
+    
+    
+    print ccb.get_index(1.5, 1.5)
+        
+# #       
+#     print ccb.interps[2]
+#         
+#     print ccb.BC_range
+#     print ccb.damage
+#     plt.plot(ccb._x_arr, ccb.E_m*ccb._epsm_arr)
+    
+#     z_arr = np.linspace(0, 200, 200)
+#     bc1 = 20*np.ones_like(z_arr)
+#     sig_m = ccb.get_sig_m_z(z_arr, bc1, bc1, 6)
+#     plt.plot(z_arr, sig_m)
+#     print ccb._x_arr
+#     print len(ccb._x_arr)
+#     print ccb._epsf0_arr
+# 
+#     plt.figure()
+#     plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
+#     for i, depsf in enumerate(ccb.sorted_depsf):
+#         epsf_x = np.maximum(ccb._epsf0_arr[i] - depsf * np.abs(ccb._x_arr), ccb._epsm_arr)
+#         print np.trapz(epsf_x - ccb._epsm_arr, ccb._x_arr)
+#         if i == 0:
+#             plt.plot(ccb._x_arr, epsf_x, color='blue', label='fibers')
+#         else:
+#             plt.plot(ccb._x_arr, epsf_x, color='black')
+#     plt.plot(ccb._x_arr, ccb._epsm_arr, lw=2, color='blue', label='matrix')
+#     plt.legend(loc='best')
+#     plt.ylabel('matrix and fiber strain [-]')
+#     plt.ylabel('long. position [mm]')
+#     plt.xlim((-100, 100))
+    
+    
+#     print ccb.max_sig_c(ccb.Ll, ccb.Lr)
+#     w_arr = np.linspace(1e-15, 1, 200)
+#     sig = []    
+#     for w in w_arr:
+#         sig.append(ccb.sig_c(w))
+#     plt.figure()
+#     plt.plot(w_arr, sig)
+#     print ccb.sig_c(0.0421542820709)
+#     w_max = ccb.max_sig_c(3.49735724, 3.49735724)[1]
+#     print w_max
+#     sig_w = []
+#     em_w = []
+#     for w in np.linspace(1e-15, w_max, 100):
+#         sig_w.append(ccb.sig_c(w))
+#         em_w.append(ccb._epsm_arr[-1])
+#     plt.figure()
+#     plt.plot(sig_w, em_w)
+#     print ccb.sig_c(0.0421542820709)
+#     plt.figure()
+#     plt.plot(np.linspace(1e-15, w_max, 100), sig_w)
+#     sig1=[]
+#     for w in w_arr:
+#         sig1.append(ccb.sig_c(w))
+#     plt.figure()
+#     plt.plot(w_arr, sig1)
+#     print ccb.sig_c(0.0421542820709)
+    plt.show()
 
 
 

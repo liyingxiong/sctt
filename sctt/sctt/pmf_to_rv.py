@@ -48,12 +48,12 @@ if __name__ == '__main__':
     
     w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2
     
-    from etsproxy.util.home_directory import \
-        get_home_directory
- 
+#     from etsproxy.util.home_directory import \
+#         get_home_directory
+#  
     import os.path
  
-    home_dir = get_home_directory()
+    home_dir = 'D:\\Eclipse\\'
         
     path = [home_dir, 'git',
             'rostar',
@@ -70,37 +70,25 @@ if __name__ == '__main__':
     test_xdata = -cb[:,2]/4. - cb[:,3]/4. - cb[:,4]/2.
     test_ydata = cb[:,1] / (11. * 0.445) * 1000
     interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
-    data = interp(w_arr)
+    exp_data = interp(w_arr)
     
-    cali = Calibration(m = 13.,
-                       data=data,
+    cali = Calibration(experi_data=exp_data,
                        w_arr=w_arr,
-                       tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
+                       tau_arr=np.logspace(np.log10(1e-5), 0.5, 50),
+                       bc=6.85,
+                       sig_mu=3.4,
+                       m = 9,
+                       sV0=0.0045)
     
-    def residuum(arr):
-        cali.sV0 = float(arr)
-        sigma = cali.responses
-        sigma[0] = 1e6*np.ones_like(cali.tau_arr)
-        data[0] = 1e6
-        residual = nnls(sigma, data)[1]
-        return residual
-    
-    sV0 = brute(residuum, ((0.0001, 0.01),), Ns=20)
-
-    sigma = cali.responses
-
-    sigma[0] = 1e5*np.ones_like(cali.tau_arr)
-    data[0] = 1e5
-    
-    x, y = nnls(sigma, data)
     
     pr = PMFtoRV(sample_points=cali.tau_arr,
-                 weights=x)
+                 weights=cali.tau_weights)
     
-    x_array = np.linspace(0, 0.2, 10000)
+    x_array = np.linspace(0, 0.2, 1000)
     pdf = pr.pdf(x_array)
     
     plt.plot(x_array, pdf)
+    print np.trapz(pdf, x_array)
     plt.show()
     
 
