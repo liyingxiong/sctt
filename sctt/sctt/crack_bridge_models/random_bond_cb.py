@@ -65,11 +65,7 @@ class RandomBondCB(HasTraits):
             V_f_arr = np.hstack((V_f_arr, np.repeat(reinf.V_f, n_int)))
             E_f_arr = np.hstack((E_f_arr, np.repeat(reinf.E_f, n_int)))
             xi_arr = np.hstack((xi_arr, np.repeat(reinf.xi, n_int)))
-            if isinstance(reinf.tau, np.ndarray):
-                stat_weights_arr = np.hstack((stat_weights_arr, reinf.stat_weights))
-            else:
-                stat_weights_arr = np.hstack((stat_weights_arr,
-                                              np.repeat(reinf.stat_weights, n_int)))
+            stat_weights_arr = np.hstack((stat_weights_arr, reinf.stat_weights))
             nu_r_arr = np.hstack((nu_r_arr, reinf.nu_r))
             r_arr = np.hstack((r_arr, reinf.r_arr))
         argsort = np.argsort(depsf_arr)[::-1]
@@ -583,27 +579,58 @@ if __name__ == '__main__':
                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
 
     reinf = ContinuousFibers(r=3.5e-3,
-                              tau=RV('weibull_min', loc=0.03, scale=.1, shape=2.),
-                              V_f=0.005,
+                              tau=RV('gamma', loc=0., scale=0.9351, shape=0.0903),
+                              V_f=0.01,
                               E_f=200e3,
-                              xi=fibers_MC(m=8., sV0=0.005),
+                              xi=fibers_MC(m=9., sV0=0.0085),
                               label='carbon',
-                              n_int=50)
+                              n_int=500)
 
         
-    ccb = RandomBondCB(E_m=25e3,
+    ccb = RandomBondCB(E_m=25e10,
                        reinforcement_lst=[reinf],
-                       Ll=5.14349827642,
-                       Lr=8.99432547615,
-                       w=0.0088,
+                       Ll=7,
+                       Lr=7,
+                       w=6.,
                        L_max = 100)
     
+    print ccb.Ll, ccb.Lr
     
+    w_arr = np.linspace(0, 0.3, 100)
+    
+    for j, w in enumerate(w_arr):
+        ccb.w = w
+        ccb.damage
+        plt.figure(num=None, figsize=(12, 6))
+        plt.clf()
+        plt.subplot(121)
+        plt.plot(ccb._x_arr, ccb.E_m*ccb._epsm_arr)
+        plt.ylim((0,5))
+        
+        plt.subplot(122)
+        plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
+        for i, depsf in enumerate(ccb.sorted_depsf):
+            epsf_x = np.maximum(ccb._epsf0_arr[i] - depsf * np.abs(ccb._x_arr), ccb._epsm_arr)
+#             print np.trapz(epsf_x - ccb._epsm_arr, ccb._x_arr)
+#             if i == 0:
+#                 plt.plot(ccb._x_arr, epsf_x, color='blue', label='fibers')
+#             else:
+            plt.plot(ccb._x_arr, epsf_x, color='black', alpha=1-ccb.damage[i])
+        plt.plot(ccb._x_arr, ccb._epsm_arr, lw=2, color='blue', label='matrix')
+        plt.legend(loc='best')
+        plt.ylabel('matrix and fiber strain [-]')
+        plt.ylabel('long. position [mm]')
+        plt.ylim((0., 0.05))
+        savepath = 'D:\cracking history\\1\\crack_opening'+str(j)+'.png'
+        plt.savefig(savepath)
 
-    print ccb.BC_range
-    
-    
-    print ccb.get_index(1.5, 1.5)
+     
+#     sig = []
+#      
+#     for w in w_arr:
+#         sig.append(ccb.sig_c(w))
+# #         
+#     plt.plot(w_arr, sig)
         
 # #       
 #     print ccb.interps[2]
@@ -619,7 +646,10 @@ if __name__ == '__main__':
 #     print ccb._x_arr
 #     print len(ccb._x_arr)
 #     print ccb._epsf0_arr
-# 
+
+# # 
+#     print ccb._epsf0_arr
+#     
 #     plt.figure()
 #     plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
 #     for i, depsf in enumerate(ccb.sorted_depsf):
@@ -633,7 +663,7 @@ if __name__ == '__main__':
 #     plt.legend(loc='best')
 #     plt.ylabel('matrix and fiber strain [-]')
 #     plt.ylabel('long. position [mm]')
-#     plt.xlim((-100, 100))
+#     plt.xlim((-500, 500))
     
     
 #     print ccb.max_sig_c(ccb.Ll, ccb.Lr)
@@ -662,7 +692,7 @@ if __name__ == '__main__':
 #     plt.figure()
 #     plt.plot(w_arr, sig1)
 #     print ccb.sig_c(0.0421542820709)
-    plt.show()
+#     plt.show()
 
 
 

@@ -51,6 +51,9 @@ class Calibration(HasTraits):
     scale = Float
     loc = Float
     
+    conti_con = Array
+    conti_weight = Float
+    
     
     #===============================================================================
     # the crack width-fiber stress response
@@ -131,42 +134,52 @@ class Calibration(HasTraits):
     #===========================================================================
     # Postprocessing for calibrated tau distribution  and sv0
     #===========================================================================
-    sigma_c = Property(depends_on='r, E_f, m, V_f')
+    sigma_c = Property(depends_on='r, E_f, m, V_f, conti_con, conti_weight')
     @cached_property
     def _get_sigma_c(self):
         sigma = self.get_sigma_tau_w(self.sV0)
         return np.sum(self.tau_weights * sigma, axis=1)
 
-    tau_weights = Property(Float, depends_on='r, E_f, m, V_f')
+    tau_weights = Property(Float, depends_on='r, E_f, m, V_f, conti_con, conti_weight')
     @cached_property
     def _get_tau_weights(self):
         sigma = (1-self.alpha)*self.get_sigma_tau_w(self.sV0)
         sigma[0] = 1e6 * np.ones_like(self.tau_arr)
+
+#         sigma1 = (1-self.alpha)*self.get_sigma_tau_w(self.sV0)
+#         sigma1[0] = 1e6 * np.ones_like(self.tau_arr)
         
-        damage = self.get_damage_portion(self.sV0, 8.5e-2)
+#         idx = np.sum(self.experi_data<=400)
+#         sigma = sigma1[0]
+# 
+#         
+#         damage = self.get_damage_portion(self.sV0, 8.5e-2)
 #         print damage
-#         T = 1e3*2. * self.tau_arr / self.r
+#         T = 1e4*2. * self.tau_arr / self.r
 #         sigma = np.vstack((sigma, T)) #constraint for initial slope of matrix stress
 
 #         for x in np.linspace(1, 7, 100):
 #             matrix_stress = self.matrix_stress(x, 4.4e-2)
 #             sigma = np.vstack((sigma, 1e3*matrix_stress))
         
-
-        rv=gam(self.shape, loc=self.loc, scale=self.scale)
+        # gamma constraint
+        rv=gam(0.176, loc=0.0057, scale=0.76)
         gamma_weight = rv.cdf(self.tau_arr) - rv.cdf(np.hstack((0, self.tau_arr[0:-1])))
         n_factor = np.amax(self.experi_data)/np.amax(gamma_weight)
-
         diagonal = self.alpha*n_factor*np.eye(len(self.tau_arr))
         sigma = np.vstack((sigma, diagonal)) #constraint for scatter of tau_weights
+
+#         diagonal = self.conti_weight*np.eye(len(self.tau_arr))
+#         sigma = np.vstack((sigma, diagonal))
         
 #         tau_sqr = 1e3*self.tau_arr**2
 #         sigma = np.vstack((sigma, tau_sqr))
         
         data = (1-self.alpha)*np.copy(self.experi_data)
         data[0] = 1e6
+#         data = np.array([1e6])
 
-#         data = np.hstack((data, 1e3*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
+#         data = np.hstack((data, 1e4*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
 
 #         data = np.hstack((data, 1e3*((self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*0.5*self.r)**2+0.2)))
 #         mean_tau = 5e2*np.ones_like(self.tau_arr)*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*self.r*0.5
@@ -178,7 +191,10 @@ class Calibration(HasTraits):
 #         stress = np.sqrt(np.linspace(1, 7, 100))/np.sqrt(7)*3.5 
 #         data = np.hstack((data, 1e3*stress))
         
+        # gamma constraint
         data = np.hstack((data, self.alpha*n_factor*gamma_weight))
+        
+#         data = np.hstack((data, self.conti_weight*self.conti_con))
 
         
         x, y = nnls(sigma, data)
@@ -187,7 +203,7 @@ class Calibration(HasTraits):
 
 if __name__ == '__main__':
 
-    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2
+    w_arr = np.linspace(0.0, np.sqrt(3.), 401) ** 2
 
 #===============================================================================
 # read experimental data

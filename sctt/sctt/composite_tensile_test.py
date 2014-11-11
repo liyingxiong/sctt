@@ -23,6 +23,8 @@ from crack_bridge_models.random_bond_cb import RandomBondCB
 from reinforcements.fiber_bundle import FiberBundle
 from calibration import Calibration
 import os.path
+from scipy.stats import gamma as gam
+
 
 
 class CompositeTensileTest(HasStrictTraits):
@@ -116,7 +118,7 @@ class CompositeTensileTest(HasStrictTraits):
                 sig_m = lambda sig_c: -self.cb.get_sig_m_z(z, Ll, Lr, sig_c)
                 sig_max = brute(sig_m, ((0., sig_cu),), Ns=6)[0]
                 return brentq(fun, 0, sig_max)
-            
+             
             except ValueError:
             # shielded zone, impossible to crack, return the ultimate stress 
                 return 1e6
@@ -270,8 +272,6 @@ class CompositeTensileTest(HasStrictTraits):
         savepath = 'D:\cracking history\\1\\BC'+str(len(self.y)-1)+'.png'
         plt.savefig(savepath)
 
-               
-            
     
     view = View(Item('L', show_label=False),
                 Item('n_x', show_label=False),
@@ -286,7 +286,8 @@ if __name__ == '__main__':
     #=============================================================================
     # calibration
     #=============================================================================
-    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2
+    w_arr = np.linspace(0.0, np.sqrt(3.), 401) ** 2
+    tau_arr=np.logspace(np.log10(1e-5), 0.5, 500)
     exp_data = np.zeros_like(w_arr)
     home_dir = 'D:\\Eclipse\\'
     for i in np.array([1, 2, 3, 4, 5]):
@@ -308,7 +309,7 @@ if __name__ == '__main__':
                        w_arr=w_arr,
                         tau_arr=np.logspace(np.log10(1e-5), 0.5, 500),
 #                         tau_arr=np.linspace(1e-5, 0.5, 500),
-                       sV0=0.005,
+                       sV0=0.0085,
                        m=9.0,
                        alpha = 0.,
                        shape = 0.176,
@@ -329,17 +330,59 @@ if __name__ == '__main__':
 #                    bc=1.85,
 #                    sig_mu=3.4)
 
-    
-    
-    
-    
-    
+#     cali = Calibration(experi_data=exp_data,
+#                        w_arr=w_arr,
+#                        tau_arr=np.logspace(np.log10(1e-5), 0.5, 500),
+#                        m = 9.,
+#                        sV0=0.005,
+#                        conti_weight = 0,
+#                        conti_con = np.ones_like(np.logspace(np.log10(1e-5), 0.5, 500)),
+#                        bc=15.,
+#                        sig_mu=3.)
+#     
+#     temp = np.hstack((0, cali.tau_weights, 0))
+#     
+#     continue_con  = np.zeros_like(cali.tau_weights)
+#     for i in range(len(cali.tau_weights)):
+#         continue_con[i] = (temp[i]+temp[i+2])/2
+#     
+#     cali.conti_weight = 1e4
+#     
+#     for j in range(50):
+#         cali.conti_con = continue_con
+#         
+#         plt.clf()
+#         plt.subplot(121)
+#         plt.plot(cali.w_arr, cali.sigma_c, '--', linewidth=2, label='calibrated response')
+#         plt.plot(cali.w_arr, exp_data, label='average experimental data')
+#         plt.xlim((0,1))
+#         plt.subplot(122)
+#         plt.bar(cali.tau_arr, cali.tau_weights, width=cali.tau_arr*0.05)
+#         plt.xscale('log')
+#         plt.xlabel('bond strength [Mpa]')
+#         savepath = 'D:\cracking history\\1\\'+str(j)+'.png'
+#         plt.savefig(savepath)
+#         
+#         temp = np.hstack((0, cali.tau_weights, 0))
+#     
+#         continue_con  = np.zeros_like(cali.tau_weights)
+#         for k in range(len(cali.tau_weights)):
+#             continue_con[k] = (temp[k]+temp[k+2])/2
+# 
+#     
+#     
+#     rv=gam(0.090313, loc=0, scale=0.9352)
+#     gamma_weight = rv.cdf(tau_arr) - rv.cdf(np.hstack((0, tau_arr[0:-1])))
+
+
+
+#     
     reinf = FiberBundle(r=0.0035,
-                  tau=cali.tau_arr,
+                  tau=tau_arr,
                   tau_weights = cali.tau_weights,
-                  V_f=0.01,
+                  V_f=0.015,
                   E_f=200e3,
-                  xi=fibers_MC(m=cali.m, sV0=cali.sV0))
+                  xi=fibers_MC(m=9, sV0=0.0085))
 
 #     cb1 = CompositeCrackBridge(E_m=25e3,
 #                                reinforcement_lst=[reinf])
@@ -351,20 +394,18 @@ if __name__ == '__main__':
 #     tau_loc = 0.0057
 # 
 #         
-#     reinf1 = ContinuousFibers(r=3.5e-3,
-#                               tau=RV('gamma', loc=tau_loc, scale=tau_scale, shape=tau_shape),
-#                               V_f=0.015,
-#                               E_f=200e3,
-#                               xi=fibers_MC(m=xi_shape, sV0=xi_scale),
-#                               label='carbon',
-#                               n_int=500)
+    reinf1 = ContinuousFibers(r=3.5e-3,
+                              tau=RV('gamma', loc=0., scale=0.651310376269, shape=0.11757297717),
+                              V_f=0.015,
+                              E_f=180e3,
+                              xi=fibers_MC(m=9, sV0=0.0085),
+                              label='carbon',
+                              n_int=500)
 
     cb =  RandomBondCB(E_m=25e3,
-                       reinforcement_lst=[reinf],
+                       reinforcement_lst=[reinf1],
                        n_BC = 12,
                        L_max = 100)
-
-
     
 #     rcb = RepresentativeCB(ccb=cb)
          
@@ -382,7 +423,7 @@ if __name__ == '__main__':
                            nsim=1,
                            loc=.0,
                            shape=50.,
-                           scale=3.4,
+                           scale=1.2*3.4,
                            distr_type='Weibull')
     
 #         random_field2 = RandomField(seed=False,
@@ -412,8 +453,29 @@ if __name__ == '__main__':
     plt.subplot(2, 2, 1)
     plt.plot(eps_c_i, sig_c_i)
     plt.plot([0.0, sig_c_u/ctt.cb.E_c], [0.0, sig_c_u])
-    plt.plot(eps_c_arr, load_arr)
-       
+    plt.plot(eps_c_arr, load_arr, lw=2)
+    
+    home_dir = 'D:\\Eclipse\\'
+    for i in range(5):
+        path1 = [home_dir, 'git',  # the path of the data file
+        'rostar',
+        'scratch',
+        'diss_figs',
+        'TT-4C-0'+str(i+1)+'.txt']
+        filepath1 = filepath = os.path.join(*path1)
+        
+        path2 = [home_dir, 'git',  # the path of the data file
+        'rostar',
+        'scratch',
+        'diss_figs',
+        'TT-6C-0'+str(i+1)+'.txt']
+        filepath2 = os.path.join(*path2)
+                
+        data = np.loadtxt(filepath1, delimiter=';')
+        plt.plot(-data[:,2]/2./250. - data[:,3]/2./250.,data[:,1]/2., lw=1, color='blue')
+        data = np.loadtxt(filepath2, delimiter=';')
+        plt.plot(-data[:,2]/2./250. - data[:,3]/2./250.,data[:,1]/2., lw=1, color='red')
+    
     plt.subplot(2, 2, 2)
     for i in range(1, len(z_x_i)):
         plt.plot(ctt.x, ctt.get_eps_f_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
