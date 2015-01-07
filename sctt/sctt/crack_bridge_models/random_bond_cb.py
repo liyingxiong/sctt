@@ -385,9 +385,13 @@ class RandomBondCB(HasTraits):
         minus_sig_c = lambda w: -self.sig_c(w)
         w_upper_bound = min(0.1*(self.Ll+self.Lr), 20)
         # determine the bound for fminbound
-        mid = brute(minus_sig_c, ((0, w_upper_bound),), Ns=10, \
-                          finish=None)
-        results = fminbound(minus_sig_c, max(0, mid-0.1*w_upper_bound), \
+        mid = brute(self.minus_sig_c, ((1e-3, w_upper_bound),), Ns=10, \
+                    finish=None)
+#         print res
+#         
+#         mid = res[0]
+        
+        results = fminbound(self.minus_sig_c, max(0, mid-0.1*w_upper_bound), \
                             mid+0.1*w_upper_bound, \
                             maxfun=50, full_output=1, disp=0)
         max_w = results[0]
@@ -418,6 +422,7 @@ class RandomBondCB(HasTraits):
         self.damage
         L_max = min(self._x_arr[-2], self.L_max) #maximum debonding length
         BC_range = np.logspace(np.log10(0.02*L_max), np.log10(L_max), self.n_BC)
+#         print BC_range
         return BC_range
 #     
     #=============================================================================
@@ -553,10 +558,11 @@ if __name__ == '__main__':
     cali = Calibration(experi_data=exp_data,
                        w_arr=w_arr,
                        tau_arr=np.logspace(np.log10(1e-5), 0.5, 100),
+                       alpha=1.,
                        bc=6.85,
                        sig_mu=3.4,
                        m = 9,
-                       sV0=0.0045)
+                       sV0=0.0085)
     
 #     plt.figure()
 #     plt.bar(cali.tau_arr, cali.tau_weights , width=0.02)
@@ -571,58 +577,103 @@ if __name__ == '__main__':
     
     
     
-    reinf1 = FiberBundle(r=0.0035,
-                  tau=cali.tau_arr,
-                  tau_weights = cali.tau_weights,
-                  V_f=0.01,
-                  E_f=200e3,
-                  xi=fibers_MC(m=cali.m, sV0=cali.sV0))
+#     reinf1 = FiberBundle(r=0.0035,
+#                   tau=cali.tau_arr,
+#                   tau_weights = cali.tau_weights,
+#                   V_f=0.01,
+#                   E_f=200e3,
+#                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
 
     reinf = ContinuousFibers(r=3.5e-3,
-                              tau=RV('gamma', loc=0., scale=0.9351, shape=0.0903),
-                              V_f=0.01,
-                              E_f=200e3,
-                              xi=fibers_MC(m=9., sV0=0.0085),
+                              tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
+                              V_f=0.010,
+                              E_f=180e3,
+                              xi=fibers_MC(m=7, sV0=0.0095),
                               label='carbon',
                               n_int=500)
 
         
-    ccb = RandomBondCB(E_m=25e10,
+    ccb = RandomBondCB(E_m=25e3,
                        reinforcement_lst=[reinf],
-                       Ll=7,
-                       Lr=7,
-                       w=6.,
-                       L_max = 100)
+                       Ll=7.,
+                       Lr=400.,
+                       L_max = 400,
+                       n_BC=20)
     
-    print ccb.Ll, ccb.Lr
-    
-    w_arr = np.linspace(0, 0.3, 100)
-    
-    for j, w in enumerate(w_arr):
-        ccb.w = w
-        ccb.damage
-        plt.figure(num=None, figsize=(12, 6))
-        plt.clf()
-        plt.subplot(121)
-        plt.plot(ccb._x_arr, ccb.E_m*ccb._epsm_arr)
-        plt.ylim((0,5))
+    strength1=[]
+    Lr_arr_1 = np.linspace(7, 400, 20)
+    for Lr in Lr_arr_1:
+        strength1.append(ccb.max_sig_c(7., Lr)[0])
         
-        plt.subplot(122)
-        plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
-        for i, depsf in enumerate(ccb.sorted_depsf):
-            epsf_x = np.maximum(ccb._epsf0_arr[i] - depsf * np.abs(ccb._x_arr), ccb._epsm_arr)
-#             print np.trapz(epsf_x - ccb._epsm_arr, ccb._x_arr)
-#             if i == 0:
-#                 plt.plot(ccb._x_arr, epsf_x, color='blue', label='fibers')
-#             else:
-            plt.plot(ccb._x_arr, epsf_x, color='black', alpha=1-ccb.damage[i])
-        plt.plot(ccb._x_arr, ccb._epsm_arr, lw=2, color='blue', label='matrix')
-        plt.legend(loc='best')
-        plt.ylabel('matrix and fiber strain [-]')
-        plt.ylabel('long. position [mm]')
-        plt.ylim((0., 0.05))
-        savepath = 'D:\cracking history\\1\\crack_opening'+str(j)+'.png'
-        plt.savefig(savepath)
+        
+    reinf.V_f=0.0015
+    strength1_5=[]
+    Lr_arr_1_5 = np.linspace(5, 400, 20)
+    for Lr in Lr_arr_1_5:
+        strength1_5.append(ccb.max_sig_c(5., Lr)[0]*1.5)
+
+    
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    plt.plot(Lr_arr_1, strength1, 'black', marker='o', label='$v_{f}=1\%$')
+    plt.plot(Lr_arr_1_5, strength1_5, 'black', marker='.', label='$v_{f}=1.5\%$')
+    plt.xlabel('$L_{\downarrow}$ [mm]')
+    plt.ylabel('Strength [Mpa]')
+    plt.tick_params(labelsize=14)
+    plt.legend()
+    plt.show()
+    
+    
+#     print ccb.interps[2]
+    
+#     print ccb.max_sig_c(8., 400.)
+    
+#     
+# #     w_arr = np.linspace(0, 3, 100)
+#     
+#     sigma = []
+# #     
+# #     print ccb.Ll, ccb.Lr
+# #     
+# #     
+#     for w in w_arr:
+#         sig_c = ccb.sig_c(w)
+#         sigma.append(sig_c)
+# #         
+# #     print np.amax(sigma)
+# #     
+#     plt.subplot(111)
+#     plt.plot(w_arr, sigma)
+#     plt.plot(w_arr, exp_data*reinf.V_f)
+#     plt.show()
+    
+#     for j, w in enumerate(w_arr):
+#         ccb.w = w
+#         ccb.damage
+#         plt.figure(num=None, figsize=(12, 6))
+#         plt.clf()
+#         plt.subplot(121)
+#         plt.plot(ccb._x_arr, ccb.E_m*ccb._epsm_arr)
+#         plt.ylim((0,5))
+#         plt.text(0, 0, ccb.sig_c(w))
+#         
+#         plt.subplot(122)
+#         plt.plot(np.zeros_like(ccb._epsf0_arr), ccb._epsf0_arr, 'ro', label='maximum')
+#         for i, depsf in enumerate(ccb.sorted_depsf):
+#             epsf_x = np.maximum(ccb._epsf0_arr[i] - depsf * np.abs(ccb._x_arr), ccb._epsm_arr)
+# #             print np.trapz(epsf_x - ccb._epsm_arr, ccb._x_arr)
+# #             if i == 0:
+# #                 plt.plot(ccb._x_arr, epsf_x, color='blue', label='fibers')
+# #             else:
+#             plt.plot(ccb._x_arr, epsf_x, color='black', alpha=1-ccb.damage[i])
+#         plt.plot(ccb._x_arr, ccb._epsm_arr, lw=2, color='blue', label='matrix')
+#         plt.legend(loc='best')
+#         plt.ylabel('matrix and fiber strain [-]')
+#         plt.ylabel('long. position [mm]')
+#         plt.ylim((0., 0.05))
+#         savepath = 'D:\cracking history\\1\\crack_opening'+str(j)+'.png'
+#         plt.savefig(savepath)
+# #         plt.close()
 
      
 #     sig = []

@@ -40,7 +40,7 @@ class CompositeTensileTest(HasStrictTraits):
     x = Property(depends_on='n_x, L') #coordinates of the material points
     @cached_property
     def _get_x(self):
-        return np.linspace(0, self.L, self.n_x)
+        return np.linspace(0, self.L, self.n_x)+350.
     sig_mu_x = Array()
 
     #=============================================================================
@@ -71,7 +71,7 @@ class CompositeTensileTest(HasStrictTraits):
             #construct a piecewise function for interpolation
             xp = np.hstack([0, y[:-1]+d, self.x[-1]])
             L_left = np.hstack([y[0], d, np.NAN])
-            L_right = np.hstack([d, self.L-y[-1], np.NAN])
+            L_right = np.hstack([d, self.L+350.-y[-1], np.NAN])
             f = interp1d(xp, np.vstack([L_left, L_right]), kind='zero')
             return f(self.x)
         except IndexError:
@@ -94,6 +94,8 @@ class CompositeTensileTest(HasStrictTraits):
             L_right = np.hstack([d, self.L-y[-1]])
             v = np.vectorize(self.cb.get_index)
             ind = v(L_left, L_right)
+#             min_indx = np.argmin(self.cb.interps[2][ind])
+#             print L_left[min_indx], L_right[min_indx]
             return np.amin(self.cb.interps[2][ind])
 
     #=============================================================================
@@ -164,11 +166,12 @@ class CompositeTensileTest(HasStrictTraits):
                 break
             print sig_c_i, y_i
             self.y.append(y_i)
+            print 'number of cracks:', len(self.y)
             sig_c_lst.append(sig_c_i)
             z_x_lst.append(np.array(self.z_x))
             BC_x_lst.append(np.array(self.BC_x))
-            self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
-            print 'strength', self.strength
+#             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
+#             print 'strength', self.strength
         print 'cracking history determined'
         sig_c_u = self.strength
         print sig_c_u
@@ -216,19 +219,19 @@ class CompositeTensileTest(HasStrictTraits):
             z_x = z_x_i[idx]
             if np.any(z_x == 2*self.L):
                 eps_arr[i] = load / self.cb.E_c
-                sig_m = load*self.cb.E_m/self.cb.E_c*np.ones_like(self.x)
+#                 sig_m = load*self.cb.E_m/self.cb.E_c*np.ones_like(self.x)
             else:
                 BC_x = BC_x_i[idx]
                 eps_arr[i] = np.trapz(self.get_eps_f_x(load, z_x, BC_x[0], \
                                       BC_x[1]), self.x) / self.L
-                sig_m = self.get_sig_m_x(load, z_x, BC_x[0], BC_x[1])
+#                 sig_m = self.get_sig_m_x(load, z_x, BC_x[0], BC_x[1])
                 
             #save the cracking history
-            plt.clf()                          
-            plt.plot(self.x, sig_m)
-            plt.plot(self.x, self.sig_mu_x)
-            savepath = 'D:\cracking history\\1\\load_step'+str(i+1)+'.png'
-            plt.savefig(savepath)
+#             plt.clf()                          
+#             plt.plot(self.x, sig_m)
+#             plt.plot(self.x, self.sig_mu_x)
+#             savepath = 'D:\cracking history\\1\\load_step'+str(i+1)+'.png'
+#             plt.savefig(savepath)
             
         return eps_arr
     
@@ -286,7 +289,7 @@ if __name__ == '__main__':
     #=============================================================================
     # calibration
     #=============================================================================
-    w_arr = np.linspace(0.0, np.sqrt(3.), 401) ** 2
+    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2
     tau_arr=np.logspace(np.log10(1e-5), 0.5, 500)
     exp_data = np.zeros_like(w_arr)
     home_dir = 'D:\\Eclipse\\'
@@ -308,14 +311,14 @@ if __name__ == '__main__':
     cali = Calibration(experi_data=exp_data,
                        w_arr=w_arr,
                         tau_arr=np.logspace(np.log10(1e-5), 0.5, 500),
-#                         tau_arr=np.linspace(1e-5, 0.5, 500),
+#                         tau_arr=np.linspace(1e-5, np.sqrt(10), 500),
                        sV0=0.0085,
                        m=9.0,
-                       alpha = 0.,
-                       shape = 0.176,
-                       loc = 0.0057,
-                       scale = 0.76,
-                       bc=13.,
+                        alpha = 1.,
+#                        shape = 0.176,
+#                        loc = 0.0057,
+#                        scale = 0.76,
+                       bc=10.,
                        sig_mu=3.4)
 #     tau_ind = np.nonzero(cali.tau_weights)
 #     cali2 = Calibration(experi_data=cali.sigma_c,
@@ -334,23 +337,23 @@ if __name__ == '__main__':
 #                        w_arr=w_arr,
 #                        tau_arr=np.logspace(np.log10(1e-5), 0.5, 500),
 #                        m = 9.,
-#                        sV0=0.005,
+#                        sV0=0.0085,
 #                        conti_weight = 0,
 #                        conti_con = np.ones_like(np.logspace(np.log10(1e-5), 0.5, 500)),
-#                        bc=15.,
-#                        sig_mu=3.)
-#     
+#                        bc=5.5,
+#                        sig_mu=3.4)
+# #     
 #     temp = np.hstack((0, cali.tau_weights, 0))
-#     
+#      
 #     continue_con  = np.zeros_like(cali.tau_weights)
 #     for i in range(len(cali.tau_weights)):
 #         continue_con[i] = (temp[i]+temp[i+2])/2
-#     
+#      
 #     cali.conti_weight = 1e4
-#     
+#      
 #     for j in range(50):
 #         cali.conti_con = continue_con
-#         
+#          
 #         plt.clf()
 #         plt.subplot(121)
 #         plt.plot(cali.w_arr, cali.sigma_c, '--', linewidth=2, label='calibrated response')
@@ -362,27 +365,27 @@ if __name__ == '__main__':
 #         plt.xlabel('bond strength [Mpa]')
 #         savepath = 'D:\cracking history\\1\\'+str(j)+'.png'
 #         plt.savefig(savepath)
-#         
+#          
 #         temp = np.hstack((0, cali.tau_weights, 0))
-#     
+#      
 #         continue_con  = np.zeros_like(cali.tau_weights)
 #         for k in range(len(cali.tau_weights)):
 #             continue_con[k] = (temp[k]+temp[k+2])/2
+# # 
+# #     
+# #     
+# #     rv=gam(0.090313, loc=0, scale=0.9352)
+# #     gamma_weight = rv.cdf(tau_arr) - rv.cdf(np.hstack((0, tau_arr[0:-1])))
 # 
-#     
-#     
-#     rv=gam(0.090313, loc=0, scale=0.9352)
-#     gamma_weight = rv.cdf(tau_arr) - rv.cdf(np.hstack((0, tau_arr[0:-1])))
-
-
-
-#     
+# 
+# 
+# #     
     reinf = FiberBundle(r=0.0035,
                   tau=tau_arr,
                   tau_weights = cali.tau_weights,
-                  V_f=0.015,
-                  E_f=200e3,
-                  xi=fibers_MC(m=9, sV0=0.0085))
+                  V_f=0.01,
+                  E_f=180e3,
+                  xi=fibers_MC(m=8, sV0=0.0095))
 
 #     cb1 = CompositeCrackBridge(E_m=25e3,
 #                                reinforcement_lst=[reinf])
@@ -395,17 +398,17 @@ if __name__ == '__main__':
 # 
 #         
     reinf1 = ContinuousFibers(r=3.5e-3,
-                              tau=RV('gamma', loc=0., scale=0.651310376269, shape=0.11757297717),
+                              tau=RV('gamma', loc=0., scale=1.49376289, shape=0.06158335),
                               V_f=0.015,
                               E_f=180e3,
-                              xi=fibers_MC(m=9, sV0=0.0085),
+                              xi=fibers_MC(m=7, sV0=0.0095),
                               label='carbon',
                               n_int=500)
 
     cb =  RandomBondCB(E_m=25e3,
                        reinforcement_lst=[reinf1],
                        n_BC = 12,
-                       L_max = 100)
+                       L_max = 400)
     
 #     rcb = RepresentativeCB(ccb=cb)
          
@@ -418,12 +421,12 @@ if __name__ == '__main__':
     
     random_field = RandomField(seed=False,
                            lacor=1.,
-                           length=300,
-                           nx=900,
+                           length=400,
+                           nx=1000,
                            nsim=1,
                            loc=.0,
                            shape=50.,
-                           scale=1.2*3.4,
+                           scale=1.3*3.4,
                            distr_type='Weibull')
     
 #         random_field2 = RandomField(seed=False,
@@ -436,24 +439,61 @@ if __name__ == '__main__':
 #                                scale=1.3 * 3.4,
 #                                distr_type='Weibull'
 #                                )
-
         
-    ctt = CompositeTensileTest(n_x = 900,
-                               L = 300,
+    ctt = CompositeTensileTest(n_x = 1000,
+                               L = 400,
                                cb=cb,
                                sig_mu_x= random_field.random_field)
     
     sig_c_i, z_x_i, BC_x_i, sig_c_u = ctt.get_cracking_history()
-    eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
+#     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
              
-    load_arr = np.linspace(0, sig_c_u, 100)
+    load_arr = np.linspace(0, sig_c_u, 50)
     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr) 
-    w_dist = ctt.get_w_dist(sig_c_i, z_x_i, BC_x_i)
-       
-    plt.subplot(2, 2, 1)
-    plt.plot(eps_c_i, sig_c_i)
-    plt.plot([0.0, sig_c_u/ctt.cb.E_c], [0.0, sig_c_u])
-    plt.plot(eps_c_arr, load_arr, lw=2)
+#     w_dist = ctt.get_w_dist(sig_c_i, z_x_i, BC_x_i)
+    
+    reinf2 = ContinuousFibers(r=3.5e-3,
+                          tau=RV('gamma', loc=0., scale=1.49376289, shape=0.06158335),
+                          V_f=0.01,
+                          E_f=180e3,
+                          xi=fibers_MC(m=7, sV0=0.0095),
+                          label='carbon',
+                          n_int=500)
+    
+    random_field2 = RandomField(seed=False,
+                           lacor=1.,
+                           length=400,
+                           nx=1000,
+                           nsim=1,
+                           loc=.0,
+                           shape=50.,
+                           scale=3.4,
+                           distr_type='Weibull')
+    
+    cb2 =  RandomBondCB(E_m=25e3,
+                       reinforcement_lst=[reinf2],
+                       n_BC = 12,
+                       L_max = 400)
+
+    
+    ctt2 = CompositeTensileTest(n_x = 1000,
+                               L = 400,
+                               cb=cb2,
+                               sig_mu_x= random_field2.random_field)
+    
+    sig_c_i2, z_x_i2, BC_x_i2, sig_c_u2 = ctt2.get_cracking_history()
+#     eps_c_i2 = ctt2.get_eps_c_i(sig_c_i2, z_x_i2, BC_x_i2)
+             
+    load_arr2 = np.linspace(0, sig_c_u2, 50)
+    eps_c_arr2 = ctt2.get_eps_c_arr(sig_c_i2, z_x_i2, BC_x_i2, load_arr2) 
+    
+#     plt.subplot(2, 2, 1)
+#     plt.plot(eps_c_i, sig_c_i)
+#     plt.plot([0.0, sig_c_u/ctt.cb.E_c], [0.0, sig_c_u])
+    
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+
     
     home_dir = 'D:\\Eclipse\\'
     for i in range(5):
@@ -472,27 +512,33 @@ if __name__ == '__main__':
         filepath2 = os.path.join(*path2)
                 
         data = np.loadtxt(filepath1, delimiter=';')
-        plt.plot(-data[:,2]/2./250. - data[:,3]/2./250.,data[:,1]/2., lw=1, color='blue')
+        plt.plot(-data[:,2]/2./250. - data[:,3]/2./250.,data[:,1]/2., lw=1, color='0.5')
         data = np.loadtxt(filepath2, delimiter=';')
-        plt.plot(-data[:,2]/2./250. - data[:,3]/2./250.,data[:,1]/2., lw=1, color='red')
-    
-    plt.subplot(2, 2, 2)
-    for i in range(1, len(z_x_i)):
-        plt.plot(ctt.x, ctt.get_eps_f_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
-        plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]) / ctt.cb.E_m)
-    plt.ylim(ymin=0.0)
-     
-    plt.subplot(2, 2, 3)
-#     plt.plot(ctt.x, z_x_i[-1])
-    plt.plot(ctt.x, ctt.sig_mu_x)
-    plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[-2], z_x_i[-2], BC_x_i[-2][0], BC_x_i[-2][1]))
-#     plt.hist(w_dist[-2])
-     
-    plt.subplot(2, 2, 4)
-    plt.plot(ctt.x, ctt.sig_mu_x)
-    for i in range(1, len(z_x_i)):
-        plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
-    plt.ylim(ymin=0.0)
+        plt.plot(-data[:,2]/2./250. - data[:,3]/2./250.,data[:,1]/2., lw=1, color='0.5')
+        
+    plt.plot(eps_c_arr, load_arr, lw=2, color='black', marker='s', label='$v_{f}=1.5\%$')
+    plt.plot(eps_c_arr2, load_arr2, lw=2, color='black', marker='o', label='$v_{f}=1\%$')
+    plt.legend(loc='best')
+    plt.xlabel('composite strain')
+    plt.ylabel('composite stress [Mpa]')
+
+#     plt.subplot(2, 2, 2)
+#     for i in range(1, len(z_x_i)):
+#         plt.plot(ctt.x, ctt.get_eps_f_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
+#         plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]) / ctt.cb.E_m)
+#     plt.ylim(ymin=0.0)
+#      
+#     plt.subplot(2, 2, 3)
+# #     plt.plot(ctt.x, z_x_i[-1])
+#     plt.plot(ctt.x, ctt.sig_mu_x)
+#     plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[-2], z_x_i[-2], BC_x_i[-2][0], BC_x_i[-2][1]))
+# #     plt.hist(w_dist[-2])
+#      
+#     plt.subplot(2, 2, 4)
+#     plt.plot(ctt.x, ctt.sig_mu_x)
+#     for i in range(1, len(z_x_i)):
+#         plt.plot(ctt.x, ctt.get_sig_m_x(sig_c_i[i], z_x_i[i], BC_x_i[i][0], BC_x_i[i][1]))
+#     plt.ylim(ymin=0.0)
    
     plt.show()
 

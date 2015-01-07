@@ -30,7 +30,7 @@ class Calibration(HasTraits):
     r = Float(0.0035, auto_set=False, enter_set=True, input=True,
               distr=['uniform', 'norm'], desc='fiber radius')
     # fiber modulus
-    E_f = Float(200e3, auto_set=False, enter_set=True, input=True,
+    E_f = Float(180e3, auto_set=False, enter_set=True, input=True,
                   distr=['uniform'])
     # shape parameter of the breaking strain distribution
     m = Float(7., auto_set=False, enter_set=True, input=True,
@@ -155,15 +155,15 @@ class Calibration(HasTraits):
 #         
 #         damage = self.get_damage_portion(self.sV0, 8.5e-2)
 #         print damage
-#         T = 1e4*2. * self.tau_arr / self.r
-#         sigma = np.vstack((sigma, T)) #constraint for initial slope of matrix stress
+        T = 1e4*2. * self.tau_arr / self.r
+        sigma = np.vstack((sigma, T)) #constraint for initial slope of matrix stress
 
 #         for x in np.linspace(1, 7, 100):
 #             matrix_stress = self.matrix_stress(x, 4.4e-2)
 #             sigma = np.vstack((sigma, 1e3*matrix_stress))
         
-        # gamma constraint
-        rv=gam(0.176, loc=0.0057, scale=0.76)
+        #gamma constraint
+        rv=gam(0.11757297717, loc=0., scale=0.651310376269)
         gamma_weight = rv.cdf(self.tau_arr) - rv.cdf(np.hstack((0, self.tau_arr[0:-1])))
         n_factor = np.amax(self.experi_data)/np.amax(gamma_weight)
         diagonal = self.alpha*n_factor*np.eye(len(self.tau_arr))
@@ -179,7 +179,7 @@ class Calibration(HasTraits):
         data[0] = 1e6
 #         data = np.array([1e6])
 
-#         data = np.hstack((data, 1e4*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
+        data = np.hstack((data, 1e4*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
 
 #         data = np.hstack((data, 1e3*((self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*0.5*self.r)**2+0.2)))
 #         mean_tau = 5e2*np.ones_like(self.tau_arr)*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*self.r*0.5
@@ -191,7 +191,7 @@ class Calibration(HasTraits):
 #         stress = np.sqrt(np.linspace(1, 7, 100))/np.sqrt(7)*3.5 
 #         data = np.hstack((data, 1e3*stress))
         
-        # gamma constraint
+        #gamma constraint
         data = np.hstack((data, self.alpha*n_factor*gamma_weight))
         
 #         data = np.hstack((data, self.conti_weight*self.conti_con))

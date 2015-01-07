@@ -26,7 +26,7 @@ from math import pi
 
 
 tau_arr=np.logspace(np.log10(1e-5), 0.5, 500)
-# tau_arr=np.linspace(1e-5, 0.5, 500)
+# tau_arr=np.linspace(1e-5, np.sqrt(10.), 500)
 
  
 # tau_arr=np.linspace(1e-5, 0.5, 400)
@@ -62,13 +62,13 @@ def get_sigma_tau_w(w_arr, tau, r, m, sV0, E_f):
 cali = Calibration(experi_data=exp_data,
                    w_arr=w_arr,
                    tau_arr=tau_arr,
-                   m = 9.,
-                   sV0=0.005,
+                   m = 5.,
+                   sV0=0.0085,
                    alpha = 0.,
                    shape = 0.176,
                    loc = 0.0057,
                    scale = 0.76,
-                   bc=10.,
+                   bc=5,
                    sig_mu=3.4)
 
     
