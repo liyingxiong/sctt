@@ -58,75 +58,89 @@ for i in np.array([1, 2, 3, 4, 5]):
     file1 = open(filepath, 'r')
     cb = np.loadtxt(file1, delimiter=';')
     test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
-    test_ydata = cb[:, 1] / (11. * 0.445) * 1000
+    test_ydata = cb[:, 1] 
     interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
     sig_w += 0.2*interp(w_arr)
 
-for m in [7, 8, 9]:
-    for s in [0.0075, 0.0080, 0.0085, 0.0090, 0.0095]:
-        
-        def func1(w_arr, k, theta):
-        
-            tau = RV('gamma', shape=k, scale=theta, loc=0.)
-            n_int = 500
-            p_arr = np.linspace(0.5/n_int, 1 - 0.5/n_int, n_int)
-            tau_arr = tau.ppf(p_arr) + 1e-10
-            
-            sV0 = s
-            m = 7.
-            r = 3.5e-3
-            E_f = 180e3
-            lm =1000.
-        
-            def cdf(e, depsf, r, lm, m, sV0):
-                '''weibull_fibers_cdf_mc'''
-                s = ((depsf*(m+1.)*sV0**m)/(2.*pi*r**2.))**(1./(m+1.))
-                a0 = (e+1e-15)/depsf
-                expfree = (e/s) ** (m + 1)
-                expfixed = a0 / (lm/2.0) * (e/s) ** (m + 1) * (1.-(1.-lm/2.0/a0)**(m+1.))
-                mask = a0 < lm/2.0
-                exp = expfree * mask + np.nan_to_num(expfixed * (mask == False))
-                return 1. - np.exp(- exp)
-               
-            T = 2. * tau_arr / r + 1e-10
-        #     k = np.sqrt(T/E_f)
-        #     ef0cb = k*np.sqrt(w_arr)
-          
-            ef0cb = np.sqrt(w_arr[:, np.newaxis] * T[np.newaxis, :]  / E_f)
-            ef0lin = w_arr[:, np.newaxis]/lm + T[np.newaxis, :]*lm/4./E_f
-            depsf = T/E_f
-            a0 = ef0cb/depsf
-            mask = a0 < lm/2.0
-            e = ef0cb * mask + ef0lin * (mask == False)
-            Gxi = cdf(e, depsf, r, lm, m, sV0)
-            mu_int = e * (1.-Gxi)
-            sigma = mu_int*E_f
-            
-            return np.sum(sigma, axis=1) / n_int
-        
-        #     lm = 1000.
-        #     spirrid.eps_vars = dict(w=w)
-        #     m = 9
-        #     spirrid.theta_vars = dict(tau=tau, E_f=Ef, V_f=V_f, r=r, m=m, sV0=sV0, lm=lm)
-        #     spirrid.n_int = n_int
-        #     sigma_c = spirrid.mu_q_arr / r ** 2
-        #     return sigma_c
-        
-        popt, pcov = curve_fit(func1, w_arr, sig_w)
-            
-        print popt
-        
-           
-        sigma = func1(w_arr, popt[0], popt[1])
-         
-        plt.plot(w_arr, sigma, label='$s_{V_0}=$'+str(s)+', $m=$'+str(m))
-    
-plt.plot(w_arr, sig_w, '--', lw=2, label='experiment')
-plt.legend(loc='best', ncol=2)
-plt.ylim((0, 700))
-plt.xlabel('crack opening [mm]')
-plt.ylabel('fiber stress [Mpa]')
+# for m in [7, 8, 9]:
 
+tau_shape = []
+tau_scale = []
+
+# for mvalue in [6.0, 7.0, 8.0, 9.0, 10.0, 11.0]:
+#     for s in [0.0070, 0.0075, 0.0080, 0.0085, 0.0090, 0.0095]:
+
+
+# for mvalue in [3., 4., 5.]:
+#     for s in [0.005485873011847417, 0.006921446101569234, 0.007094400237837161]:
+# # for s in [0.0020]:
+#     
+#         def func1(w_arr, k, theta):
+#         
+#             tau = RV('gamma', shape=k, scale=theta, loc=0.)
+#             n_int = 500
+#             p_arr = np.linspace(0.5/n_int, 1 - 0.5/n_int, n_int)
+#             tau_arr = tau.ppf(p_arr) + 1e-10
+#             
+#             sV0 = s
+#             m = mvalue
+#             r = 3.5e-3
+#             E_f = 180e3
+#             lm =1000.
+#         
+#             def cdf(e, depsf, r, lm, m, sV0):
+#                 '''weibull_fibers_cdf_mc'''
+#                 s = ((depsf*(m+1.)*sV0**m)/(2.*pi*r**2.))**(1./(m+1.))
+#                 a0 = (e+1e-15)/depsf
+#                 expfree = (e/s) ** (m + 1)
+#                 expfixed = a0 / (lm/2.0) * (e/s) ** (m + 1) * (1.-(1.-lm/2.0/a0)**(m+1.))
+#                 mask = a0 < lm/2.0
+#                 exp = expfree * mask + np.nan_to_num(expfixed * (mask == False))
+#                 return 1. - np.exp(- exp)
+#     
+#                
+#             T = 2. * tau_arr / r + 1e-10
+#         #     k = np.sqrt(T/E_f)
+#         #     ef0cb = k*np.sqrt(w_arr)
+#           
+#             ef0cb = np.sqrt(w_arr[:, np.newaxis] * T[np.newaxis, :]  / E_f)
+#             ef0lin = w_arr[:, np.newaxis]/lm + T[np.newaxis, :]*lm/4./E_f
+#             depsf = T/E_f
+#             a0 = ef0cb/depsf
+#             mask = a0 < lm/2.0
+#             e = ef0cb * mask + ef0lin * (mask == False)
+#             Gxi = cdf(e, depsf, r, lm, m, sV0)
+#             mu_int = e * (1.-Gxi)
+#             sigma = mu_int*E_f
+#             
+#             return np.sum(sigma, axis=1) / n_int * (11. * 0.445) / 1000
+#         
+#         #     lm = 1000.
+#         #     spirrid.eps_vars = dict(w=w)
+#         #     m = 9
+#         #     spirrid.theta_vars = dict(tau=tau, E_f=Ef, V_f=V_f, r=r, m=m, sV0=sV0, lm=lm)
+#         #     spirrid.n_int = n_int
+#         #     sigma_c = spirrid.mu_q_arr / r ** 2
+#         #     return sigma_c
+#         
+#         popt, pcov = curve_fit(func1, w_arr, sig_w)
+#             
+#         tau_shape.append(popt[0])
+#         tau_scale.append(popt[1])
+#         
+#            
+#         sigma = func1(w_arr, popt[0], popt[1])
+#          
+#         plt.plot(w_arr, sigma, label='$s_{V_0}=$'+str(s)+', $m=$'+str(mvalue))
+#  
+# print tau_shape
+# print tau_scale    
+plt.plot(w_arr, sig_w, '--', lw=2, label='single crack bridge test')
+plt.legend(loc='best', ncol=3)
+plt.ylim((0, 3.5))
+plt.xlabel('crack opening [mm]')
+plt.ylabel('fiber force [KN]')
+ 
 plt.show()
 
 

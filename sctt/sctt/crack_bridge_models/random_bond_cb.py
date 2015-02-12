@@ -332,6 +332,11 @@ class RandomBondCB(HasTraits):
                                        self.sorted_r[masks[i]],
                                        x_short[masks[i]],
                                        x_long[masks[i]])
+            elif method.__doc__ == 'weibull_fibers_cdf_dry':
+                Pf[masks[i]] += method(epsy[masks[i]],
+                                       self.sorted_r[masks[i]],
+                                        x_short[masks[i]]+x_long[masks[i]])
+#                                        1000)
             else:
                 Pf[masks[i]] += method(epsy[masks[i]])
         return Pf
@@ -434,6 +439,7 @@ class RandomBondCB(HasTraits):
         interps_sigm = []
         interps_epsf = []
         sig_max_lst = []
+        interps_damage = []
         t1 = t.clock()
         print 'preparing the interpolators:'
         for j, L_r in enumerate(self.BC_range):
@@ -450,6 +456,7 @@ class RandomBondCB(HasTraits):
                     epsf_record = []
                     sigm_record = []
                     sigc_record = []
+                    damage_record = []
                      
                     for w in w_arr:
                         self.w = w
@@ -476,6 +483,7 @@ class RandomBondCB(HasTraits):
                         epsf_record.append(epsf_x)
                         sigm_record.append(sigm_x)
                         sigc_record.append(sigc)
+                        damage_record.append(np.average(self.damage, weights=self.sorted_stats_weights))
                     
                     #=============================================================================
                     # plot the stress or strain profile under given BC                     
@@ -489,15 +497,17 @@ class RandomBondCB(HasTraits):
    
                     interp_epsf = interp2d(x_arr_record, sigc_record, epsf_record)
                     interp_sigm = interp2d(x_arr_record, sigc_record, sigm_record)
+                    interp_damage = interp1d(sigc_record, damage_record, bounds_error=False, fill_value=damage_record[-1])
                      
                     print ((j+1)*j/2+q+1)*100/(self.n_BC*(self.n_BC+1)/2), '%'
                      
                     interps_epsf.append(interp_epsf)
                     interps_sigm.append(interp_sigm)
                     sig_max_lst.append(sigma_max)
+                    interps_damage.append(interp_damage)
                      
         print 'time consumed:', t.clock()-t1
-        return interps_epsf, interps_sigm, np.array(sig_max_lst)
+        return interps_epsf, interps_sigm, np.array(sig_max_lst), interps_damage
 # 
     #=============================================================================
     # functions for evaluation of stress and strain profile 
@@ -535,46 +545,54 @@ if __name__ == '__main__':
 #                       V_f=0.1,
 #                       E_f=240e3,
 #                       xi=0.035)
-    from calibration import Calibration
-    import os.path
+
     from stats.pdistrib.weibull_fibers_composite_distr import \
         WeibullFibers, fibers_MC
-  
-    w_arr = np.linspace(0.0, np.sqrt(8.), 401) ** 2    
-    home_dir = 'D:\\Eclipse\\'
-    path = [home_dir, 'git',  # the path of the data file
-            'rostar',
-            'scratch',
-            'diss_figs',
-            'CB1.txt']
-    filepath = os.path.join(*path)
-    exp_data = np.zeros_like(w_arr)
-    file1 = open(filepath, 'r')
-    cb = np.loadtxt(file1, delimiter=';')
-    test_xdata = -cb[:, 2] / 4. - cb[:, 3] / 4. - cb[:, 4] / 2.
-    test_ydata = cb[:, 1] / (11. * 0.445) * 1000
-    interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
-    exp_data = interp(w_arr)
-    cali = Calibration(experi_data=exp_data,
-                       w_arr=w_arr,
-                       tau_arr=np.logspace(np.log10(1e-5), 0.5, 100),
-                       alpha=1.,
-                       bc=6.85,
-                       sig_mu=3.4,
-                       m = 9,
-                       sV0=0.0085)
-    
-#     plt.figure()
-#     plt.bar(cali.tau_arr, cali.tau_weights , width=0.02)
+    from scipy.optimize import brentq
 
     
-    
-#     tau_ind = np.nonzero(cali.tau_weights)
-    
-    from pmf_to_rv import PMFtoRV
-    rv = PMFtoRV(sample_points=cali.tau_arr,
-                 weights=cali.tau_weights)
-    
+#     reinf = ContinuousFibers(r=3.5e-3,
+#                               tau=RV('gamma', loc=0., scale=1.95982817, shape=0.05221831),
+#                               V_f=0.015,
+#                               E_f=180e3,
+#                               xi=fibers_MC(m=6, sV0=0.0090),
+#                               label='carbon',
+#                               n_int=500)
+# 
+#         
+#     ccb = RandomBondCB(E_m=25e3,
+#                        reinforcement_lst=[reinf],
+#                        Ll=7.,
+#                        Lr=7.,
+#                        L_max = 400,
+#                        n_BC=20)
+#     
+#     w_arr = np.linspace(1e-15, 0.6, 400)
+#     sig_w_arr = []
+#     damage_arr = []
+#     for w in w_arr:
+#         sig_w_arr.append(ccb.sig_c(w))
+#         ccb.w = w
+#         ccb.damage
+#         damage_arr.append(np.average(ccb.damage, weights=ccb.sorted_stats_weights))
+#      
+#     
+#     plt.rc('text', usetex=True)
+#     plt.rc('font', family='serif')
+# 
+#        
+#     fig, ax1 = plt.subplots()
+#     ax1.plot(w_arr, sig_w_arr, 'k')
+#     ax1.set_ylabel('stress [MPa]')
+#     ax1.set_xlabel('crack opening [mm]')
+# 
+#     
+#     ax2 = ax1.twinx()
+#     ax2.plot(w_arr, damage_arr, 'k--')
+#     ax2.set_ylabel('breaking probability')
+#     plt.show()
+        
+        
     
     
 #     reinf1 = FiberBundle(r=0.0035,
@@ -584,45 +602,88 @@ if __name__ == '__main__':
 #                   E_f=200e3,
 #                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
 
-    reinf = ContinuousFibers(r=3.5e-3,
-                              tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
-                              V_f=0.010,
-                              E_f=180e3,
-                              xi=fibers_MC(m=7, sV0=0.0095),
-                              label='carbon',
-                              n_int=500)
-
-        
-    ccb = RandomBondCB(E_m=25e3,
-                       reinforcement_lst=[reinf],
-                       Ll=7.,
-                       Lr=400.,
-                       L_max = 400,
-                       n_BC=20)
-    
-    strength1=[]
-    Lr_arr_1 = np.linspace(7, 400, 20)
-    for Lr in Lr_arr_1:
-        strength1.append(ccb.max_sig_c(7., Lr)[0])
-        
-        
-    reinf.V_f=0.0015
-    strength1_5=[]
-    Lr_arr_1_5 = np.linspace(5, 400, 20)
-    for Lr in Lr_arr_1_5:
-        strength1_5.append(ccb.max_sig_c(5., Lr)[0]*1.5)
-
-    
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    plt.plot(Lr_arr_1, strength1, 'black', marker='o', label='$v_{f}=1\%$')
-    plt.plot(Lr_arr_1_5, strength1_5, 'black', marker='.', label='$v_{f}=1.5\%$')
-    plt.xlabel('$L_{\downarrow}$ [mm]')
-    plt.ylabel('Strength [Mpa]')
-    plt.tick_params(labelsize=14)
-    plt.legend()
+#===========================================================================================
+    sV0_arr = []
+    m_arr = [6., 7., 8., 9., 10., 11.]
+    for m in m_arr:
+         
+        def cbstrength(sV0):
+            reinf = ContinuousFibers(r=3.5e-3,
+                                      tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
+                                      V_f=0.010,
+                                      E_f=180e3,
+                                      xi=fibers_MC(m=m, sV0=sV0),
+                                      label='carbon',
+                                      n_int=500)
+ 
+            ccb = RandomBondCB(E_m=25e3,
+                               reinforcement_lst=[reinf],
+                               Ll=7.,
+                               Lr=400.,
+                               L_max = 400,
+                               n_BC=20)
+            return ccb.max_sig_c(7., 375.)[0]-12.01
+         
+        sV0_arr.append(brentq(cbstrength,1e-15, 0.015))
+         
+     
+    strength = []    
+    for i, m in enumerate(m_arr):
+        s = sV0_arr[i]
+        reinf = ContinuousFibers(r=3.5e-3,
+                          tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
+                          V_f=0.015,
+                          E_f=180e3,
+                          xi=fibers_MC(m=7, sV0=0.0095),
+                          label='carbon',
+                          n_int=500)
+        ccb = RandomBondCB(E_m=25e3,
+                   reinforcement_lst=[reinf],
+                   Ll=7.,
+                   Lr=400.,
+                   L_max = 400,
+                   n_BC=20)
+ 
+        strength.append(ccb.max_sig_c(5., 375.)[0])
+     
+    print strength
+    plt.plot(m_arr, strength)
+     
+    plt.ylim((0, 25.))
     plt.show()
+#==========================================================================================
+        
+#     plt.plot([6., 7., 8., 9., 10., 11.], sV0_arr)
+#     plt.show()
     
+        
+        
+        
+    
+#     strength1=[]
+#     Lr_arr_1 = np.linspace(7, 400, 20)
+#     for Lr in Lr_arr_1:
+#         strength1.append(ccb.max_sig_c(7., Lr)[0])
+#         
+#         
+#     reinf.V_f=0.0015
+#     strength1_5=[]
+#     Lr_arr_1_5 = np.linspace(5, 400, 20)
+#     for Lr in Lr_arr_1_5:
+#         strength1_5.append(ccb.max_sig_c(5., Lr)[0]*1.5)
+
+    
+#     plt.rc('text', usetex=True)
+#     plt.rc('font', family='serif')
+#     plt.plot(Lr_arr_1, strength1, 'black', marker='o', label=r'$v_{f}=1\%$, fiber-MC')
+#     plt.plot(Lr_arr_1_5, strength1_5, 'black', marker='.', label=r'$v_{f}=1.5\%$, fiber-MC')
+#     plt.xlabel('$L_{\downarrow}$ [mm]')
+#     plt.ylabel('Strength [Mpa]')
+#     plt.tick_params(labelsize=14)
+#     plt.legend()
+#     plt.show()
+
+        
     
 #     print ccb.interps[2]
     

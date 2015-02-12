@@ -18,7 +18,7 @@ import time as t
 import os.path
 from scipy.interpolate import interp1d
 from random_bond_cb import RandomBondCB, FiberBundle
-from calibration import Calibration
+
 
 
 class RepresentativeCB(HasStrictTraits):
