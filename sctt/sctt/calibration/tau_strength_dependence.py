@@ -18,12 +18,12 @@ x, y =np.meshgrid(sV0_arr, m_arr)
 
 def interp_tau_shape(s_f, psi_f):
     interp_shape = interp2d(x, y, tau_shape)
-    return interp_shape(s_f, psi_f)
+    return float(interp_shape(s_f, psi_f))
 
 
 def interp_tau_scale(s_f, psi_f):
     interp_scale = interp2d(x, y, tau_scale)
-    return interp_scale(s_f, psi_f)
+    return float(interp_scale(s_f, psi_f))
 
 if __name__ == '__main__':
 

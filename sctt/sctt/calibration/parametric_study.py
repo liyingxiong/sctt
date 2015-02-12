@@ -5,7 +5,6 @@ Created on 09.10.2014
 '''
 
 from crack_bridge_models.random_bond_cb import RandomBondCB
-from calibration import Calibration
 import numpy as np
 from scipy.interpolate import interp1d
 import os.path
@@ -27,8 +26,8 @@ random_field = RandomField(seed=False,
                        nx=1000,
                        nsim=1,
                        loc=.0,
-                       shape=25.,
-                       scale=1.3*3.67829544828,
+                       shape=35.,
+                       scale=3.3788,
                        distr_type='Weibull')
 
 tau_shape = np.array([0.079392235619918011, 0.070557619484416842, 0.063299300020833421, 0.057273453501868139, 0.052218314012133477, 0.04793148098051675, 0.10184138982654255, 0.090386833801161789, 0.081105577459563358, 0.073447931456124799, 0.067031491579850458, 0.061583354951796301, 0.12549447436183159, 0.11100174486617211, 0.099332453863924197, 0.089751925690600545, 0.081757089644320463, 0.074992574602765982, 0.14872431076672932, 0.1310279952657768, 0.11687910678733873, 0.10533009089253634, 0.09573957473543436, 0.08765870476491136, 0.17114399856895063, 0.15019973334235998, 0.13356519781922624, 0.12006215401696788, 0.10890090044135943, 0.099533619810760268, 0.19267340894906607, 0.16847672735868743, 0.14937828293751562, 0.1339549206939461, 0.12126139030716455, 0.11064685293542306])
@@ -39,15 +38,25 @@ tau_scale = np.array([0.85377504364710732, 1.0754895775375046, 1.333640259534559
 
 n_cracks = []
 
-for i,m in enumerate([6.0, 7.0, 8.0, 9.0, 10.0, 11.0]):
-    for j,s in enumerate([0.0070, 0.0075, 0.0080, 0.0085, 0.0090, 0.0095]):
+# for i,m in enumerate([6.0, 7.0, 8.0, 9.0, 10.0, 11.0]):
+#     for j,s in enumerate([0.0070, 0.0075, 0.0080, 0.0085, 0.0090, 0.0095]):
+
+from tau_strength_dependence import interp_tau_scale, interp_tau_shape
+# 
+for i,m in enumerate([6.0]):
+    for j,s in enumerate([0.0090]):
         
-        scale = tau_scale[i*6+j]
-        shape = tau_shape[i*6+j]
+#         scale = tau_scale[i*6+j]
+#         shape = tau_shape[i*6+j]
+
+        scale = interp_tau_scale(s,m)
+        shape = interp_tau_shape(s,m)
+        
+        
 
         reinf = ContinuousFibers(r=3.5e-3,
                                   tau=RV('gamma', loc=0., scale=scale, shape=shape),
-                                  V_f=0.015,
+                                  V_f=0.01,
                                   E_f=180e3,
                                   xi=fibers_MC(m=m, sV0=s),
                                   label='carbon',

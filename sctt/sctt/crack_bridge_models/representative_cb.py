@@ -254,23 +254,8 @@ if __name__ == '__main__':
     test_ydata = cb[:, 1] / (11. * 0.445) * 1000
     interp = interp1d(test_xdata, test_ydata, bounds_error=False, fill_value=0.)
     exp_data = interp(w_arr)
-    cali = Calibration(experi_data=exp_data,
-                       w_arr=w_arr,
-                       tau_arr=np.logspace(np.log10(1e-5), np.log10(1), 200))
-    tau_ind = np.nonzero(cali.tau_weights)
     
-    
-    
-#     reinf = FiberBundle(r=0.0035,
-#                   tau=cali.tau_arr[tau_ind],
-#                   tau_weights = cali.tau_weights[tau_ind],
-#                   V_f=0.1,
-#                   E_f=200e3,
-#                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
-#          
-#     cb1 = RandomBondCB(E_m=25e3,
-#                        reinforcement_lst=[reinf])
-    
+        
     reinf1 = ContinuousFibers(r=3.5e-3,
                               tau=RV('weibull_min', loc=0.01, scale=.1, shape=2.),
                               V_f=0.005,
