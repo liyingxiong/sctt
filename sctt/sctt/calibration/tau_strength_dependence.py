@@ -5,6 +5,9 @@ Created on Jan 22, 2015
 '''
 import numpy as np
 from scipy.interpolate import interp2d
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 
 
 tau_shape = [0.079392235619918011, 0.070557619484416842, 0.063299300020833421, 0.057273453501868139, 0.052218314012133477, 0.04793148098051675, 0.10184138982654255, 0.090386833801161789, 0.081105577459563358, 0.073447931456124799, 0.067031491579850458, 0.061583354951796301, 0.12549447436183159, 0.11100174486617211, 0.099332453863924197, 0.089751925690600545, 0.081757089644320463, 0.074992574602765982, 0.14872431076672932, 0.1310279952657768, 0.11687910678733873, 0.10533009089253634, 0.09573957473543436, 0.08765870476491136, 0.17114399856895063, 0.15019973334235998, 0.13356519781922624, 0.12006215401696788, 0.10890090044135943, 0.099533619810760268, 0.19267340894906607, 0.16847672735868743, 0.14937828293751562, 0.1339549206939461, 0.12126139030716455, 0.11064685293542306]
@@ -14,6 +17,12 @@ tau_scale = np.array(tau_scale).reshape(6,6)
 m_arr = np.array([6.0, 7.0, 8.0, 9.0, 10.0, 11.0])
 sV0_arr = np.array([0.0070, 0.0075, 0.0080, 0.0085, 0.0090, 0.0095])
 x, y =np.meshgrid(sV0_arr, m_arr)
+
+# fig = plt.figure()
+# ax = fig.gca(projection='3d')
+# ax.plot_surface(x, y, tau_scale, rstride=1, cstride=1)
+# 
+# plt.show()
 
 
 def interp_tau_shape(s_f, psi_f):
@@ -26,9 +35,10 @@ def interp_tau_scale(s_f, psi_f):
     return float(interp_scale(s_f, psi_f))
 
 if __name__ == '__main__':
-
-    print tau_scale
-    print tau_shape
+    
+    print [tau_scale*tau_shape]
+    print [tau_scale**2*tau_shape]
+#     print tau_shape
     
     print interp_tau_shape(0.0095, 7.0)
     print interp_tau_scale(0.0095, 7.0)

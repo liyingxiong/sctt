@@ -155,19 +155,19 @@ class Calibration(HasTraits):
 #         
 #         damage = self.get_damage_portion(self.sV0, 8.5e-2)
 #         print damage
-        T = 1e4*2. * self.tau_arr / self.r
-        sigma = np.vstack((sigma, T)) #constraint for initial slope of matrix stress
+#         T = 1e4*2. * self.tau_arr / self.r
+#         sigma = np.vstack((sigma, T)) #constraint for initial slope of matrix stress
 
 #         for x in np.linspace(1, 7, 100):
 #             matrix_stress = self.matrix_stress(x, 4.4e-2)
 #             sigma = np.vstack((sigma, 1e3*matrix_stress))
         
         #gamma constraint
-        rv=gam(0.11757297717, loc=0., scale=0.651310376269)
-        gamma_weight = rv.cdf(self.tau_arr) - rv.cdf(np.hstack((0, self.tau_arr[0:-1])))
-        n_factor = np.amax(self.experi_data)/np.amax(gamma_weight)
-        diagonal = self.alpha*n_factor*np.eye(len(self.tau_arr))
-        sigma = np.vstack((sigma, diagonal)) #constraint for scatter of tau_weights
+#         rv=gam(0.11757297717, loc=0., scale=0.651310376269)
+#         gamma_weight = rv.cdf(self.tau_arr) - rv.cdf(np.hstack((0, self.tau_arr[0:-1])))
+#         n_factor = np.amax(self.experi_data)/np.amax(gamma_weight)
+#         diagonal = self.alpha*n_factor*np.eye(len(self.tau_arr))
+#         sigma = np.vstack((sigma, diagonal)) #constraint for scatter of tau_weights
 
 #         diagonal = self.conti_weight*np.eye(len(self.tau_arr))
 #         sigma = np.vstack((sigma, diagonal))
@@ -179,7 +179,7 @@ class Calibration(HasTraits):
         data[0] = 1e6
 #         data = np.array([1e6])
 
-        data = np.hstack((data, 1e4*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
+#         data = np.hstack((data, 1e4*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)))
 
 #         data = np.hstack((data, 1e3*((self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*0.5*self.r)**2+0.2)))
 #         mean_tau = 5e2*np.ones_like(self.tau_arr)*self.sig_mu*(1-self.V_f)/(self.bc*self.V_f)*self.r*0.5
@@ -192,7 +192,7 @@ class Calibration(HasTraits):
 #         data = np.hstack((data, 1e3*stress))
         
         #gamma constraint
-        data = np.hstack((data, self.alpha*n_factor*gamma_weight))
+#         data = np.hstack((data, self.alpha*n_factor*gamma_weight))
         
 #         data = np.hstack((data, self.conti_weight*self.conti_con))
 
@@ -203,7 +203,9 @@ class Calibration(HasTraits):
 
 if __name__ == '__main__':
 
-    w_arr = np.linspace(0.0, np.sqrt(3.), 401) ** 2
+#     w_arr = np.linspace(0.0, np.sqrt(3.), 401) ** 2
+
+    w_arr = np.linspace(0.0, 1.0, 400)
 
 #===============================================================================
 # read experimental data
@@ -226,193 +228,202 @@ if __name__ == '__main__':
 
 
 #     for m in np.linspace(2., 30., 29):
-    m=4
-    sv0_lst = []
-    sig_saturated_max1 = []
-    w_lst = []
-    m_lst = []
-    y_lst = []
-    sig_bc = []
-     
-    while m<=30:
- 
-        m += 1
-        print m
+#     m=4
+#     sv0_lst = []
+#     sig_saturated_max1 = []
+#     w_lst = []
+#     m_lst = []
+#     y_lst = []
+#     sig_bc = []
+#      
+#     while m<=30:
+#  
+#         m += 1
+#         print m
+mean_list = []
+for m in [6., 7., 8., 9.]:
+    for sV0 in [0.0070, 0.0075, 0.0080, 0.0085]:
         cali = Calibration(experi_data=exp_data,
                            w_arr=w_arr,
                            tau_arr=np.logspace(np.log10(1e-4), 0.5, 400),
-                           bc=6.85,
-                           sig_mu=3.4,
-                           sV0 = 0.0045,
-                           m=m
-                           )
+#                            bc=6.85,
+#                            sig_mu=3.4,
+                           sV0 = sV0,
+                           m=m)
+        
+        weight = cali.tau_weights
+        mean = np.average(cali.tau_arr, weights = cali.tau_weights)
+        mean_list.append(mean)
+
+print mean_list
+
     
     #===============================================================================
     # output
     #===============================================================================
     
-        sV0 = cali.sV0
-        
-        sigma = cali.get_sigma_tau_w(sV0)
-        sigma_avg = cali.sigma_c
-        
-#         print 'stdv', np.dot(cali.tau_weights, (cali.tau_arr)**2)-(cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)*0.5*cali.r)**2
-    
-        plt.clf()
-        plt.subplot(321)
-        plt.plot(cali.w_arr, sigma_avg, '--', linewidth=2)
-        plt.plot(cali.w_arr, exp_data)
-        plt.xlim(0, 8)
-        plt.ylim(0, 700)
-    #     plt.text(0.5, 0.5, 'm=' + str(m) + ', sV0=' + str(float(sV0))[:7])
-        plt.subplot(322)
-        plt.bar(np.log10(cali.tau_arr), cali.tau_weights , width=0.02)
-        tau_e = cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)*0.5*cali.r
-        plt.plot((np.log10(tau_e), np.log10(tau_e)), (0, 1.), '--')
-        plt.xlim(-5, 1)
-        plt.ylim(0, 1)
-    #     plt.plot(cali.tau_arr, x)
-        plt.subplot(323)
-        plt.plot(cali.w_arr, sigma)
-        plt.xlim(0, 8)
-        plt.ylim(0, 3000)
-        print 'mean T:'+str(cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f))
-        print 'weighted sum of T:'+str(np.sum(cali.tau_weights*2*cali.tau_arr/cali.r))
-    
-    
-        plt.subplot(324)
-        x = cali.tau_weights
-        for i, sigmai in enumerate(sigma.T):
-            plt.plot(cali.w_arr, sigmai, color='0', lw='1.5', alpha=x[i] / np.max(x))
-    #     plt.show()
-        plt.xlim(0, 8)
-        plt.ylim(0, 3000)
-
-        
-#         tau_ind = np.nonzero(x)
-#          
-#         reinf1 = FiberBundle(r=0.0035,
-#                             tau=cali.tau_arr[tau_ind],
-#                             tau_weights = x[tau_ind],
-#                             V_f=0.01,
-#                             E_f=200e3,
-#                             xi=fibers_MC(m=cali.m, sV0=float(sV0))
-#                             )
-#         cb1 =  RandomBondCB(E_m=25e3,
-#                            reinforcement_lst=[reinf1],
-#                            Ll=6.85,
-#                            Lr=6.85)
-#  
-#  
-#         reinf2 = FiberBundle(r=0.0035,
-#                             tau=cali.tau_arr[tau_ind],
-#                             tau_weights = x[tau_ind],
-#                             V_f=0.015,
-#                             E_f=200e3,
-#                             xi=fibers_MC(m=cali.m, sV0=float(sV0))
-#                             )
-#         cb2 = RandomBondCB(E_m=25e3,
-#                            reinforcement_lst=[reinf2],
-#                            Ll=4.03,
-#                            Lr=4.03)
-#          
-#         sig_saturated1 = np.zeros_like(cali.w_arr)
-#         sig_saturated2 = np.zeros_like(cali.w_arr)
-#         for i, w in enumerate(cali.w_arr):
-#             sig_saturated1[i] = cb1.sig_c(w)
-#             sig_saturated2[i] = cb2.sig_c(w)
-#          
-#         plt.subplot(325)
-#         ind = np.nonzero(sig_saturated2)
-#         plt.plot(cali.w_arr[ind], sig_saturated1[ind]/0.01, label='0.01')
-#         plt.plot(cali.w_arr[ind], sig_saturated2[ind]/0.015, label='0.015')
-#         plt.legend()
-#         plt.xlim(0, 0.3)
+#         sV0 = cali.sV0
+#         
+#         sigma = cali.get_sigma_tau_w(sV0)
+#         sigma_avg = cali.sigma_c
+#         
+# #         print 'stdv', np.dot(cali.tau_weights, (cali.tau_arr)**2)-(cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)*0.5*cali.r)**2
+#     
+#         plt.clf()
+#         plt.subplot(321)
+#         plt.plot(cali.w_arr, sigma_avg, '--', linewidth=2)
+#         plt.plot(cali.w_arr, exp_data)
+#         plt.xlim(0, 8)
+#         plt.ylim(0, 700)
+#     #     plt.text(0.5, 0.5, 'm=' + str(m) + ', sV0=' + str(float(sV0))[:7])
+#         plt.subplot(322)
+#         plt.bar(np.log10(cali.tau_arr), cali.tau_weights , width=0.02)
+#         tau_e = cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)*0.5*cali.r
+#         plt.plot((np.log10(tau_e), np.log10(tau_e)), (0, 1.), '--')
+#         plt.xlim(-5, 1)
+#         plt.ylim(0, 1)
+#     #     plt.plot(cali.tau_arr, x)
+#         plt.subplot(323)
+#         plt.plot(cali.w_arr, sigma)
+#         plt.xlim(0, 8)
 #         plt.ylim(0, 3000)
-         
-#         plt.show()
-         
- 
-#         savepath = 'D:\\parametric study\\cb_1\\m='+str(m)+' sV0='+str(float(sV0))[:7]+'.png'
-        sv0_lst.append(sV0)
-#         max_ind = np.argmax(sig_saturated)
-#         sig_saturated_max.append(sig_saturated[max_ind])
-#         w_lst.append(cali.w_arr[max_ind])
-        m_lst.append(m)
-        y_lst.append(cali.get_lack_of_fit(sV0))
-         
-         
-         
-         
-#         cb1.Ll = 250
-#         cb1.Lr = 250
+#         print 'mean T:'+str(cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f))
+#         print 'weighted sum of T:'+str(np.sum(cali.tau_weights*2*cali.tau_arr/cali.r))
+#     
+#     
+#         plt.subplot(324)
+#         x = cali.tau_weights
+#         for i, sigmai in enumerate(sigma.T):
+#             plt.plot(cali.w_arr, sigmai, color='0', lw='1.5', alpha=x[i] / np.max(x))
+#     #     plt.show()
+#         plt.xlim(0, 8)
+#         plt.ylim(0, 3000)
+# 
+#         
+# #         tau_ind = np.nonzero(x)
+# #          
+# #         reinf1 = FiberBundle(r=0.0035,
+# #                             tau=cali.tau_arr[tau_ind],
+# #                             tau_weights = x[tau_ind],
+# #                             V_f=0.01,
+# #                             E_f=200e3,
+# #                             xi=fibers_MC(m=cali.m, sV0=float(sV0))
+# #                             )
+# #         cb1 =  RandomBondCB(E_m=25e3,
+# #                            reinforcement_lst=[reinf1],
+# #                            Ll=6.85,
+# #                            Lr=6.85)
+# #  
+# #  
+# #         reinf2 = FiberBundle(r=0.0035,
+# #                             tau=cali.tau_arr[tau_ind],
+# #                             tau_weights = x[tau_ind],
+# #                             V_f=0.015,
+# #                             E_f=200e3,
+# #                             xi=fibers_MC(m=cali.m, sV0=float(sV0))
+# #                             )
+# #         cb2 = RandomBondCB(E_m=25e3,
+# #                            reinforcement_lst=[reinf2],
+# #                            Ll=4.03,
+# #                            Lr=4.03)
+# #          
+# #         sig_saturated1 = np.zeros_like(cali.w_arr)
+# #         sig_saturated2 = np.zeros_like(cali.w_arr)
+# #         for i, w in enumerate(cali.w_arr):
+# #             sig_saturated1[i] = cb1.sig_c(w)
+# #             sig_saturated2[i] = cb2.sig_c(w)
+# #          
+# #         plt.subplot(325)
+# #         ind = np.nonzero(sig_saturated2)
+# #         plt.plot(cali.w_arr[ind], sig_saturated1[ind]/0.01, label='0.01')
+# #         plt.plot(cali.w_arr[ind], sig_saturated2[ind]/0.015, label='0.015')
+# #         plt.legend()
+# #         plt.xlim(0, 0.3)
+# #         plt.ylim(0, 3000)
 #          
-#         cb2.Ll = 250
-#         cb2.Lr = 250
+# #         plt.show()
 #          
-#         sig_interp1 = np.zeros_like(cali.w_arr)
-#         sig_interp2 = np.zeros_like(cali.w_arr)
+#  
+# #         savepath = 'D:\\parametric study\\cb_1\\m='+str(m)+' sV0='+str(float(sV0))[:7]+'.png'
+#         sv0_lst.append(sV0)
+# #         max_ind = np.argmax(sig_saturated)
+# #         sig_saturated_max.append(sig_saturated[max_ind])
+# #         w_lst.append(cali.w_arr[max_ind])
+#         m_lst.append(m)
+#         y_lst.append(cali.get_lack_of_fit(sV0))
 #          
-#         for i, w in enumerate(cali.w_arr):
-#             sig_interp1[i] = cb1.sig_c(w)
-#             sig_interp2[i] = cb2.sig_c(w)
+#          
+#          
+#          
+# #         cb1.Ll = 250
+# #         cb1.Lr = 250
+# #          
+# #         cb2.Ll = 250
+# #         cb2.Lr = 250
+# #          
+# #         sig_interp1 = np.zeros_like(cali.w_arr)
+# #         sig_interp2 = np.zeros_like(cali.w_arr)
+# #          
+# #         for i, w in enumerate(cali.w_arr):
+# #             sig_interp1[i] = cb1.sig_c(w)
+# #             sig_interp2[i] = cb2.sig_c(w)
+# #  
+# #  
+# #  
+# #          
+# #  
+# #          
+# #          
+# #          
+# #         plt.subplot(326)
+# #         ind1 = np.argmax(sig_interp1[1:])
+# #         f1 = interp1d(sig_interp1[1:ind1], cali.w_arr[1:ind1])
+# #          
+# #         ind2 = np.argmax(sig_interp2[1:])
+# #         f2 = interp1d(sig_interp2[1:ind2], cali.w_arr[1:ind2])
+# #          
+# #         cb1.w = float(f1(5))
+# #         print cb1.w
+# #         cb1.damage
+#          
+# #         cb2.w = float(f2(5))
+# #         print cb2.w
+# #         cb2.damage
+# #  
+# #         plt.plot(cb1._x_arr, cb1.E_m*cb1._epsm_arr, label='1@5')
+# #         plt.plot(cb2._x_arr, cb2.E_m*cb2._epsm_arr, label='1.5@5')
+#          
+# #         cb1.w = float(f1(10))
+# #         print cb1.w
+# #         cb1.damage
+# #          
+# #         cb2.w = float(f2(10))
+# #         print cb2.w
+# #         cb2.damage
+# #  
+# #         plt.plot(cb1._x_arr, cb1.E_m*cb1._epsm_arr, label='1@10')
+# #         plt.plot(cb2._x_arr, cb2.E_m*cb2._epsm_arr, label='15@10')
+#  
+# #         plt.legend()
+# #         plt.xlim(0, 200)
+# #         plt.ylim(0, 10.)
+# #         sig_bc.append(cb.E_m*cb._epsm_arr[-1])
+#          
+#         savepath = 'D:\\parametric study\\number of tau\\m='+str(m)+'.png'
+#         plt.savefig(savepath)
 #  
 #  
-#  
-#          
-#  
-#          
-#          
-#          
-#         plt.subplot(326)
-#         ind1 = np.argmax(sig_interp1[1:])
-#         f1 = interp1d(sig_interp1[1:ind1], cali.w_arr[1:ind1])
-#          
-#         ind2 = np.argmax(sig_interp2[1:])
-#         f2 = interp1d(sig_interp2[1:ind2], cali.w_arr[1:ind2])
-#          
-#         cb1.w = float(f1(5))
-#         print cb1.w
-#         cb1.damage
-         
-#         cb2.w = float(f2(5))
-#         print cb2.w
-#         cb2.damage
-#  
-#         plt.plot(cb1._x_arr, cb1.E_m*cb1._epsm_arr, label='1@5')
-#         plt.plot(cb2._x_arr, cb2.E_m*cb2._epsm_arr, label='1.5@5')
-         
-#         cb1.w = float(f1(10))
-#         print cb1.w
-#         cb1.damage
-#          
-#         cb2.w = float(f2(10))
-#         print cb2.w
-#         cb2.damage
-#  
-#         plt.plot(cb1._x_arr, cb1.E_m*cb1._epsm_arr, label='1@10')
-#         plt.plot(cb2._x_arr, cb2.E_m*cb2._epsm_arr, label='15@10')
- 
-#         plt.legend()
-#         plt.xlim(0, 200)
-#         plt.ylim(0, 10.)
-#         sig_bc.append(cb.E_m*cb._epsm_arr[-1])
-         
-        savepath = 'D:\\parametric study\\number of tau\\m='+str(m)+'.png'
-        plt.savefig(savepath)
- 
- 
-     
-    plt.clf()
-    plt.subplot(221)
-    plt.plot(m_lst, sv0_lst)
-    plt.subplot(222)
-#     plt.plot(m_lst, sig_saturated_max)
-    plt.subplot(223)
-    plt.plot(m_lst, y_lst)
-    plt.subplot(224)
-    plt.plot(m_lst, w_lst)
-    plt.show()
+#      
+#     plt.clf()
+#     plt.subplot(221)
+#     plt.plot(m_lst, sv0_lst)
+#     plt.subplot(222)
+# #     plt.plot(m_lst, sig_saturated_max)
+#     plt.subplot(223)
+#     plt.plot(m_lst, y_lst)
+#     plt.subplot(224)
+#     plt.plot(m_lst, w_lst)
+#     plt.show()
 
 
 

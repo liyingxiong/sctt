@@ -7,7 +7,6 @@ from etsproxy.traits.ui.api import \
 from util.traits.editors.mpl_figure_editor import MPLFigureEditor
 from random_fields.simple_random_field import SimpleRandomField
 from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.stochastic_cb import StochasticCB
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.hom_CB_elastic_mtrx \
     import CompositeCrackBridge
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \

@@ -551,21 +551,31 @@ if __name__ == '__main__':
     from scipy.optimize import brentq
 
     
-#     reinf = ContinuousFibers(r=3.5e-3,
-#                               tau=RV('gamma', loc=0., scale=1.95982817, shape=0.05221831),
-#                               V_f=0.015,
-#                               E_f=180e3,
-#                               xi=fibers_MC(m=6, sV0=0.0090),
-#                               label='carbon',
-#                               n_int=500)
-# 
-#         
-#     ccb = RandomBondCB(E_m=25e3,
-#                        reinforcement_lst=[reinf],
-#                        Ll=7.,
-#                        Lr=7.,
-#                        L_max = 400,
-#                        n_BC=20)
+    reinf = ContinuousFibers(r=3.5e-3,
+                              tau=RV('gamma', loc=0., scale=2.3273933214348754, shape=0.04793148098051675),
+                              V_f=0.010,
+                              E_f=180e3,
+                              xi=fibers_MC(m=6, sV0=0.0095),
+                              label='carbon',
+                              n_int=500)
+ 
+         
+    ccb = RandomBondCB(E_m=25e3,
+                       reinforcement_lst=[reinf],
+                       Ll=150.,
+                       Lr=150.,
+                       L_max = 400,
+                       n_BC=12)
+    
+    z_arr = np.linspace(0, 150, 300)
+    Ll_arr = 150.*np.ones_like(z_arr)
+    Lr_arr = 5.*np.ones_like(z_arr)
+    for load in [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]:
+        sig_m = ccb.get_sig_m_z(z_arr, Ll_arr, Lr_arr, load)
+        plt.plot(z_arr, sig_m, label='load='+str(load))
+    plt.xlim((0,120))
+    plt.legend(loc='best', ncol=2)
+    plt.show()
 #     
 #     w_arr = np.linspace(1e-15, 0.6, 400)
 #     sig_w_arr = []
@@ -603,54 +613,54 @@ if __name__ == '__main__':
 #                   xi=fibers_MC(m=cali.m, sV0=cali.sV0))
 
 #===========================================================================================
-    sV0_arr = []
-    m_arr = [6., 7., 8., 9., 10., 11.]
-    for m in m_arr:
-         
-        def cbstrength(sV0):
-            reinf = ContinuousFibers(r=3.5e-3,
-                                      tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
-                                      V_f=0.010,
-                                      E_f=180e3,
-                                      xi=fibers_MC(m=m, sV0=sV0),
-                                      label='carbon',
-                                      n_int=500)
- 
-            ccb = RandomBondCB(E_m=25e3,
-                               reinforcement_lst=[reinf],
-                               Ll=7.,
-                               Lr=400.,
-                               L_max = 400,
-                               n_BC=20)
-            return ccb.max_sig_c(7., 375.)[0]-12.01
-         
-        sV0_arr.append(brentq(cbstrength,1e-15, 0.015))
-         
-     
-    strength = []    
-    for i, m in enumerate(m_arr):
-        s = sV0_arr[i]
-        reinf = ContinuousFibers(r=3.5e-3,
-                          tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
-                          V_f=0.015,
-                          E_f=180e3,
-                          xi=fibers_MC(m=7, sV0=0.0095),
-                          label='carbon',
-                          n_int=500)
-        ccb = RandomBondCB(E_m=25e3,
-                   reinforcement_lst=[reinf],
-                   Ll=7.,
-                   Lr=400.,
-                   L_max = 400,
-                   n_BC=20)
- 
-        strength.append(ccb.max_sig_c(5., 375.)[0])
-     
-    print strength
-    plt.plot(m_arr, strength)
-     
-    plt.ylim((0, 25.))
-    plt.show()
+#     sV0_arr = []
+#     m_arr = [6., 7., 8., 9., 10., 11.]
+#     for m in m_arr:
+#          
+#         def cbstrength(sV0):
+#             reinf = ContinuousFibers(r=3.5e-3,
+#                                       tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
+#                                       V_f=0.010,
+#                                       E_f=180e3,
+#                                       xi=fibers_MC(m=m, sV0=sV0),
+#                                       label='carbon',
+#                                       n_int=500)
+#  
+#             ccb = RandomBondCB(E_m=25e3,
+#                                reinforcement_lst=[reinf],
+#                                Ll=7.,
+#                                Lr=400.,
+#                                L_max = 400,
+#                                n_BC=20)
+#             return ccb.max_sig_c(7., 375.)[0]-12.01
+#          
+#         sV0_arr.append(brentq(cbstrength,1e-15, 0.015))
+#          
+#      
+#     strength = []    
+#     for i, m in enumerate(m_arr):
+#         s = sV0_arr[i]
+#         reinf = ContinuousFibers(r=3.5e-3,
+#                           tau=RV('gamma', loc=0.0, scale=1.49376289, shape=0.06158335),
+#                           V_f=0.015,
+#                           E_f=180e3,
+#                           xi=fibers_MC(m=7, sV0=0.0095),
+#                           label='carbon',
+#                           n_int=500)
+#         ccb = RandomBondCB(E_m=25e3,
+#                    reinforcement_lst=[reinf],
+#                    Ll=7.,
+#                    Lr=400.,
+#                    L_max = 400,
+#                    n_BC=20)
+#  
+#         strength.append(ccb.max_sig_c(5., 375.)[0])
+#      
+#     print strength
+#     plt.plot(m_arr, strength)
+#      
+#     plt.ylim((0, 25.))
+#     plt.show()
 #==========================================================================================
         
 #     plt.plot([6., 7., 8., 9., 10., 11.], sV0_arr)
