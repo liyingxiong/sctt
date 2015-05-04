@@ -178,8 +178,9 @@ class CompositeTensileTest(HasStrictTraits):
         print 'cracking history determined'
         sig_c_u = self.strength
         print sig_c_u
-#         self.y = []
-        return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst, sig_c_u
+        n_cracks = len(self.y)
+        self.y = []
+        return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst, sig_c_u, n_cracks
 
     #=========================================================================
     # post processing

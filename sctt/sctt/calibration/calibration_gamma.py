@@ -70,9 +70,9 @@ for sV0 in [0.0080, 0.0085, 0.0090, 0.0095]:
                 s = ((depsf * (m + 1.) * sV0 ** m) /
                      (2. * pi * r ** 2.)) ** (1. / (m + 1.))
                 a0 = (e + 1e-15) / depsf
-                expfree = (e / s) ** (m + 1)
+                expfree = (e / s) ** (m + 1.)
                 expfixed = a0 / \
-                    (lm / 2.0) * (e / s) ** (m + 1) * \
+                    (lm / 2.0) * (e / s) ** (m + 1.) * \
                     (1. - (1. - lm / 2.0 / a0) ** (m + 1.))
                 mask = a0 < lm / 2.0
                 exp = expfree * mask + \

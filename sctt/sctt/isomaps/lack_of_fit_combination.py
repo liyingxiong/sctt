@@ -1,7 +1,7 @@
 '''
-Created on Mar 13, 2015
+Created on Apr 13, 2015
 
-@author: Li Yingxiong
+@author: Yingxiong
 '''
 from lmfit import minimize, Parameters, Parameter, report_fit
 import numpy as np
@@ -13,10 +13,9 @@ from math import pi
 import time as t
 from scipy.special import gamma
 
-# for w_max in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0]:
-# for s_f in [0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012]:
+
 # experimental data to be fitted
-w_arr = np.linspace(0., 0.8, 100)
+w_arr = np.linspace(0., 1, 100)
 sig_w = np.zeros_like(w_arr)
 home_dir = 'D:\\Eclipse\\'
 for i in np.array([1, 2, 3, 4, 5]):
@@ -35,16 +34,29 @@ for i in np.array([1, 2, 3, 4, 5]):
         test_xdata, test_ydata, bounds_error=False, fill_value=0.)
     sig_w += 0.2 * interp(w_arr)
 
+# m = 7.
+# for m in [6., 7., 8., 9., 10., 11.]:
+# for sV0 in [0.0070, 0.0075, 0.008, 0.0085, 0.009, 0.0095]:
+    #     for shape in np.linspace(0.079, 0.0047, 5):
+
+    # define objective function: returns the array to be minimized
+
 
 def fcn2min(params, x, data):
     """ model decaying sine wave, subtract data"""
     shape = params['shape'].value
     scale = params['scale'].value
-#     loc = params['loc'].value
-#     m = params['f_shape'].value
-#         sV0 = params['f_scale'].value
-    sV0 = 0.007
-    m = 7.
+    m = params['f_shape'].value
+    sV0 = params['f_scale'].value
+#     m = 8.806672387136711
+#     sV0 = 0.013415768576509945
+#     sV0 = 3243. / \
+#         (182e3 * (pi * 3.5e-3 ** 2 * 50.) ** (-1. / m) * gamma(1 + 1. / m))
+#     shape = 0.0505
+#     scale = 2.276
+#     CS = 12.
+#     mu_tau = 1.3 * 3.5e-3 * 3.6 * (1. - 0.01) / (2. * 0.01 * CS)
+#     scale = mu_tau / shape
 
     tau = RV('gamma', shape=shape, scale=scale, loc=0.)
     n_int = 500
@@ -52,7 +64,7 @@ def fcn2min(params, x, data):
     tau_arr = tau.ppf(p_arr) + 1e-10
     r = 3.5e-3
     E_f = 180e3
-    lm = np.inf
+    lm = 1000.
 
     def cdf(e, depsf, r, lm, m, sV0):
         '''weibull_fibers_cdf_mc'''
@@ -85,38 +97,32 @@ def fcn2min(params, x, data):
 
 # create a set of Parameters
 params = Parameters()
-params.add('shape',   value=1.,  min=0.)
-params.add('scale', value=1., min=0.)
-# params.add('loc', value=0., min=0.)
-# params.add('f_shape', value=25., min=0)
-#     params.add('f_scale', value=0.0142, min=0)
-
-# kcs = fcn2min(params, w_arr, sig_w)
-# print np.sum(kcs ** 2)
+params.add('shape',   value=1.,  min=0)
+params.add('scale', value=1., min=0)
+params.add('f_shape', value=6., min=0)
+params.add('f_scale', value=0.007, min=0)
 
 # do fit
-# available methods
 result = minimize(
-    fcn2min, params, method='nelder', args=(w_arr, sig_w))
+    fcn2min, params, method='Nelder-Mead', args=(w_arr, sig_w))
 
-# print sV0
-# print 'w_max', w_max
-print 'lack of fit', result.chisqr
 print params
 
-# calculate final result
-final = sig_w + result.residual
+m_f = params['f_shape'].value
+s_f = params['f_scale'].value
+m_tau = params['shape'].value
+s_tau = params['scale'].value
 
-plt.cla()
-plt.plot(
-    w_arr, final, label='model')
-plt.plot(w_arr, sig_w, 'k--', lw=2, label='experimental')
-plt.legend(loc='best')
-# path = 'D:\\fig\\' + str(w_max) + '.png'
-# plt.savefig(path)
-# plt.title('m_f=' + str(m))
-# plt.figure()
-# plt.plot(w_arr1, sig_w1, 'k--', lw=2, label='experimental')
-# sig1 = fcn2min(params, w_arr1, sig_w1) + sig_w1
-# plt.plot(w_arr1, sig1, 'k', lw=2, label='model')
-plt.show()
+from lack_of_fit_f import plot_f
+from lack_of_fit_m_f_s_tau import plot_m_f_s_tau
+from lack_of_fit_s_f_m_tau import plot_s_f_m_tau
+from lack_of_fit_scale import plot_scale
+from lack_of_fit_shape import plot_shape
+from lack_of_fit_tau import plot_tau
+
+plot_f(m_f, s_f, m_tau, s_tau, w_arr, sig_w)
+plot_m_f_s_tau(m_f, s_f, m_tau, s_tau, w_arr, sig_w)
+plot_s_f_m_tau(m_f, s_f, m_tau, s_tau, w_arr, sig_w)
+plot_scale(m_f, s_f, m_tau, s_tau, w_arr, sig_w)
+plot_shape(m_f, s_f, m_tau, s_tau, w_arr, sig_w)
+plot_tau(m_f, s_f, m_tau, s_tau, w_arr, sig_w)

@@ -16,6 +16,7 @@ from stats.misc.random_field.random_field_1D import RandomField
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
 from spirrid.rv import RV
+from calibration.matrix_strength_dependence import interp_m_shape
 
 # plot the experimental responses
 home_dir = 'D:\\Eclipse\\'
@@ -42,14 +43,19 @@ for i in range(5):
     plt.plot(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
              data[:, 1] / 2., lw=1, color='0.5')
 
+# matrix parameters
+m_scale = 3.50
+m_shape = interp_m_shape(m_scale)
+print m_shape
+
 
 # v_f=1.0%
 reinf1 = ContinuousFibers(r=3.5e-3,
                           tau=RV(
-                              'gamma', loc=0., scale=2.276, shape=0.0505),
+                              'gamma', loc=0., scale=1.321, shape=0.066),
                           V_f=0.01,
                           E_f=180e3,
-                          xi=fibers_MC(m=8.806, sV0=0.0134),
+                          xi=fibers_MC(m=7.718, sV0=0.00996),
                           label='carbon',
                           n_int=500)
 
@@ -64,8 +70,8 @@ random_field = RandomField(seed=False,
                            nx=400,
                            nsim=1,
                            loc=.0,
-                           shape=45.,
-                           scale=3.599,
+                           shape=m_shape,
+                           scale=m_scale,
                            distr_type='Weibull')
 
 ctt = CompositeTensileTest(n_x=400,
@@ -91,10 +97,10 @@ plt.plot(crack_eps, sig_c_i, 'ko')
 # v_f=1.5%
 reinf2 = ContinuousFibers(r=3.5e-3,
                           tau=RV(
-                              'gamma', loc=0.,  scale=2.276, shape=0.0505),
+                              'gamma', loc=0.,  scale=1.321, shape=0.066),
                           V_f=0.015,
                           E_f=180e3,
-                          xi=fibers_MC(m=8.806, sV0=0.0134),
+                          xi=fibers_MC(m=7.718, sV0=0.00996),
                           label='carbon',
                           n_int=500)
 
@@ -109,8 +115,8 @@ random_field1 = RandomField(seed=False,
                             nx=400,
                             nsim=1,
                             loc=.0,
-                            shape=45.,
-                            scale=1.218 * 3.599,
+                            shape=m_shape,
+                            scale=1.218 * m_scale,
                             distr_type='Weibull')
 
 ctt = CompositeTensileTest(n_x=400,
