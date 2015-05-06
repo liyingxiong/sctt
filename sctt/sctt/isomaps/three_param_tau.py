@@ -170,7 +170,7 @@ def plot_s_l(s_tau, m_tau, l_tau, w_arr, sig_w):
 
         return np.sum(residual ** 2)
 
-    n = 10
+    n = 30
     s_tau_arr = np.linspace(0.75 * s_tau, 1.25 * s_tau, n)
     l_tau_arr = np.linspace(0.75 * l_tau, 1.25 * l_tau, n)
 
@@ -186,12 +186,15 @@ def plot_s_l(s_tau, m_tau, l_tau, w_arr, sig_w):
 
     plt.figure(figsize=(12, 9))
     im = plt.imshow(delta, interpolation='bilinear', origin='lower',
-                    cmap=cm.gray, extent=(0.75 * s_tau, 1.25 * s_tau, 0.75 * l_tau, 1.25 * l_tau), aspect=s_tau / l_tau)
+                    cmap=cm.gray_r, extent=(0.75 * s_tau, 1.25 * s_tau, 0.75 * l_tau, 1.25 *
+                                            l_tau), aspect=s_tau / l_tau)
     levels = np.arange(0, 10, 0.2)
     CS = plt.contour(delta, levels,
                      origin='lower',
                      linewidths=1,
+                     cmap=cm.gray,
                      extent=(0.75 * s_tau, 1.25 * s_tau, 0.75 * l_tau, 1.25 * l_tau))
+
     plt.clabel(CS, levels[1::2],  # label every second level
                inline=1,
                fmt='%1.1f',
@@ -199,7 +202,7 @@ def plot_s_l(s_tau, m_tau, l_tau, w_arr, sig_w):
     # CB = plt.colorbar(CS, shrink=0.8, extend='both')
 
     plt.title('lack of fit')
-    plt.flag()
+#     plt.flag()
 
     CBI = plt.colorbar(im, shrink=0.8)
 
@@ -232,6 +235,6 @@ if __name__ == '__main__':
             test_xdata, test_ydata, bounds_error=False, fill_value=0.)
         sig_w += 0.2 * interp(w_arr)
 
-    plot_m_s(1.440, 0.0539, 0.001260, w_arr, sig_w)
+    plot_s_l(1.440, 0.0539, 0.001260, w_arr, sig_w)
 
     plt.show()

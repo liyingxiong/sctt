@@ -64,16 +64,16 @@ for w_max in [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8, 2.2, 2.6, 3
     r = 3.5e-3
     E_f = 180e3
     min_loc = E_f * w_max * r / (2 * 500 ** 2)
-    print ''
-    print ''
-    print 'w_max', w_max
-    print 'min_l', min_loc
+#     print ''
+#     print ''
+#     print 'w_max', w_max
+#     print 'min_l', min_loc
 
     # create a set of Parameters
     params = Parameters()
     params.add('scale', value=1., min=0.)
     params.add('shape',   value=1.,  min=0.)
-    params.add('loc', value=0., min=min_loc)
+    params.add('loc', value=0., min=0.)
     # params.add('f_shape', value=25., min=0)
     #     params.add('f_scale', value=0.0142, min=0)
 
@@ -83,7 +83,7 @@ for w_max in [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8, 2.2, 2.6, 3
     # do fit
     # available methods
     result = minimize(
-        fcn2min, params, method='nelder', args=(w_arr, sig_w))
+        fcn2min, params, method='lbfgsb', args=(w_arr, sig_w))
 
     # print sV0
     # print 'w_max', w_max

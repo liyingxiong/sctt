@@ -25,6 +25,9 @@ from reinforcements.fiber_bundle import FiberBundle
 import os.path
 from scipy.stats import gamma as gam
 from scipy.integrate import cumtrapz
+import time as t
+import warnings
+warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 class CompositeTensileTest(HasStrictTraits):
@@ -102,39 +105,27 @@ class CompositeTensileTest(HasStrictTraits):
     #=========================================================================
     # Determine the cracking load level
     #=========================================================================
-    def get_sig_c_z(self, sig_mu, z, Ll, Lr):
+    def get_sig_c_z(self, sig_mu, z, Ll, Lr, sig_c_i_1):
         '''Determine the composite remote stress initiating a crack 
         at position z'''
         fun = lambda sig_c: sig_mu - self.cb.get_sig_m_z(z, Ll, Lr, sig_c)
-        ind = self.cb.get_index(Ll, Lr)
-        sig_cu = self.cb.interps[2][ind]
         try:
             # search the cracking stress level between zero and ultimate
             # composite stress
-            return brentq(fun, 0, sig_cu)
+            return newton(fun, sig_c_i_1)
 
-        except ValueError:
-            # solution not found
-            try:
-                # find the load level corresponding to the maximum matrix stress
-                # (non-monotonic)
-                sig_m = lambda sig_c: -self.cb.get_sig_m_z(z, Ll, Lr, sig_c)
-                sig_max = brute(sig_m, ((0., sig_cu),), Ns=6)[0]
-                return brentq(fun, 0, sig_max)
-
-            except ValueError:
-                # shielded zone, new cracks are impossible, return the ultimate
-                # stress
-                return 1e6
+        except (RuntimeWarning, RuntimeError):
+            # no solution, shielded zone
+            return 1e6
 
     get_sig_c_x_i = np.vectorize(get_sig_c_z)
 
-    def get_sig_c_i(self):
+    def get_sig_c_i(self, sig_c_i_1):
         '''Determine the new crack position and level of composite stress
         '''
         # for each material point find the load factor initiating a crack
         sig_c_x_i = self.get_sig_c_x_i(self, self.sig_mu_x,
-                                       self.z_x, self.BC_x[0], self.BC_x[1])
+                                       self.z_x, self.BC_x[0], self.BC_x[1], sig_c_i_1)
         # get the position of the material point corresponding to
         # the minimum cracking load factor
         y_idx = np.argmin(sig_c_x_i)
@@ -162,9 +153,11 @@ class CompositeTensileTest(HasStrictTraits):
         z_x_lst.append(np.array(self.z_x))
         BC_x_lst.append(np.array(self.BC_x))
 
+        t1 = t.time()
+        print 'begin', t1
         # determine the following cracking load factors
         while True:
-            sig_c_i, y_i = self.get_sig_c_i()
+            sig_c_i, y_i = self.get_sig_c_i(sig_c_lst[-1])
             if sig_c_i >= self.strength or sig_c_i == 1e6:
                 break
             print sig_c_i, y_i
@@ -175,6 +168,7 @@ class CompositeTensileTest(HasStrictTraits):
             BC_x_lst.append(np.array(self.BC_x))
 #             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
 #             print 'strength', self.strength
+        print 'time consumed', t.time() - t1
         print 'cracking history determined'
         sig_c_u = self.strength
         print sig_c_u
@@ -445,30 +439,30 @@ if __name__ == '__main__':
 
     cb = RandomBondCB(E_m=25e3,
                       reinforcement_lst=[reinf1],
-                      n_BC=12,
+                      n_BC=8,
                       L_max=120.)
 
     random_field = RandomField(seed=False,
                                lacor=1.,
-                               length=120,
-                               nx=400,
+                               length=500,
+                               nx=1000,
                                nsim=1,
                                loc=.0,
                                shape=45.,
                                scale=3.599,
                                distr_type='Weibull')
 
-    ctt = CompositeTensileTest(n_x=400,
-                               L=120,
+    ctt = CompositeTensileTest(n_x=1000,
+                               L=500,
                                cb=cb,
                                sig_mu_x=random_field.random_field)
 
-    sig_c_i, z_x_i, BC_x_i, sig_c_u = ctt.get_cracking_history()
+    sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history()
 #     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
     print '1.0%', [sig_c_i]
     print np.sort(ctt.y)
 
-    load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 50), sig_c_i)))
+    load_arr = np.unique(np.hstack((np.linspace(0, 30, 100), sig_c_i)))
     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
 #     damage_arr = ctt.get_damage_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
     crack_eps = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, sig_c_i)
@@ -500,48 +494,48 @@ if __name__ == '__main__':
 #     plt.plot(eps_c_arr, load_arr, 'k--', label='vf=1.5')
 #     plt.plot(crack_eps_a, sig_c_i, '.')
 
-    reinf2 = ContinuousFibers(r=3.5e-3,
-                              tau=RV(
-                                  'gamma', loc=0.,  scale=2.276, shape=0.0505),
-                              V_f=0.015,
-                              E_f=180e3,
-                              xi=fibers_MC(m=8.806, sV0=0.0134),
-                              label='carbon',
-                              n_int=500)
-
-    cb1 = RandomBondCB(E_m=25e3,
-                       reinforcement_lst=[reinf2],
-                       n_BC=12,
-                       L_max=120.)
-
-    random_field1 = RandomField(seed=False,
-                                lacor=1.,
-                                length=120,
-                                nx=400,
-                                nsim=1,
-                                loc=.0,
-                                shape=45.,
-                                scale=1.218 * 3.599,
-                                distr_type='Weibull')
-
-    ctt = CompositeTensileTest(n_x=400,
-                               L=120,
-                               cb=cb1,
-                               sig_mu_x=random_field1.random_field)
-
-    sig_c_i, z_x_i, BC_x_i, sig_c_u = ctt.get_cracking_history()
-    eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
-
-    print '1.5%', [sig_c_i]
-    print np.sort(ctt.y)
-
-    load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 50), sig_c_i)))
-    eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
+#     reinf2 = ContinuousFibers(r=3.5e-3,
+#                               tau=RV(
+#                                   'gamma', loc=0.,  scale=2.276, shape=0.0505),
+#                               V_f=0.015,
+#                               E_f=180e3,
+#                               xi=fibers_MC(m=8.806, sV0=0.0134),
+#                               label='carbon',
+#                               n_int=500)
+#
+#     cb1 = RandomBondCB(E_m=25e3,
+#                        reinforcement_lst=[reinf2],
+#                        n_BC=8,
+#                        L_max=120.)
+#
+#     random_field1 = RandomField(seed=False,
+#                                 lacor=1.,
+#                                 length=120,
+#                                 nx=400,
+#                                 nsim=1,
+#                                 loc=.0,
+#                                 shape=45.,
+#                                 scale=1.218 * 3.599,
+#                                 distr_type='Weibull')
+#
+#     ctt = CompositeTensileTest(n_x=400,
+#                                L=120,
+#                                cb=cb1,
+#                                sig_mu_x=random_field1.random_field)
+#
+#     sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history()
+#     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
+#
+#     print '1.5%', [sig_c_i]
+#     print np.sort(ctt.y)
+#
+#     load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 50), sig_c_i)))
+#     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
 # damage_arr = ctt.get_damage_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
-    crack_eps = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, sig_c_i)
-
-    plt.plot(eps_c_arr, load_arr, 'k--', lw=2, label='$v_\mathrm{f}=1.5\%$')
-    plt.plot(crack_eps, sig_c_i, 'ko')
+#     crack_eps = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, sig_c_i)
+#
+#     plt.plot(eps_c_arr, load_arr, 'k--', lw=2, label='$v_\mathrm{f}=1.5\%$')
+#     plt.plot(crack_eps, sig_c_i, 'ko')
 
     plt.legend(loc='best')
     plt.show()
