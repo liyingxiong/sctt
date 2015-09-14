@@ -4,7 +4,6 @@ Created on 10.10.2014
 @author: Li Yingxiong
 '''
 from crack_bridge_models.random_bond_cb import RandomBondCB
-from calibration import Calibration
 import numpy as np
 from scipy.interpolate import interp1d
 import os.path
@@ -13,7 +12,7 @@ from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
 import matplotlib.pyplot as plt
 from scipy.optimize import fmin, fmin_powell, fmin_slsqp
-
+from calibration import Calibration
 
 
 tau_arr=np.logspace(np.log10(1e-5), 0.5, 100)
