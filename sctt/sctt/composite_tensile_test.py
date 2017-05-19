@@ -379,6 +379,7 @@ if __name__ == '__main__':
     #     plt.rc('font', family='serif')
 
     home_dir = 'D:\\Eclipse\\'
+    home_dir = '/home/rch'
     for i in range(5):
         #     for i in [0]:
         #     for i in [2]:

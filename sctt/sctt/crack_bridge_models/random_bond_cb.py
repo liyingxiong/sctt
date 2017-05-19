@@ -1,4 +1,4 @@
-from traits.api import HasTraits, Array, List, Float, Int, \
+from traits.api import HasTraits, Array, Instance, List, Float, Int, \
     Property, cached_property
 from util.traits.either_type import EitherType
 from types import FloatType
@@ -591,7 +591,6 @@ if __name__ == '__main__':
     #                       V_f=0.1,
     #                       E_f=240e3,
     #                       xi=0.035)
-
     from stats.pdistrib.weibull_fibers_composite_distr import \
         WeibullFibers, fibers_MC
     from scipy.optimize import brentq
@@ -709,7 +708,6 @@ if __name__ == '__main__':
 #     plt.plot([6., 7., 8., 9., 10., 11.], sV0_arr)
 #     plt.show()
 
-
 #     strength1=[]
 #     Lr_arr_1 = np.linspace(7, 400, 20)
 #     for Lr in Lr_arr_1:
@@ -732,7 +730,6 @@ if __name__ == '__main__':
 #     plt.tick_params(labelsize=14)
 #     plt.legend()
 #     plt.show()
-
 
 #     print ccb.interps[2]
 
