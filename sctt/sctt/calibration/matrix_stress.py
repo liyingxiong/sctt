@@ -321,7 +321,7 @@ print 'avg', np.average(stress6)
 print 'COV', variation(stress6)
 # plt.hist(rec_6*(cb2.E_m/cb2.E_c), bin_arr, label='mixture rule')
 plt.xlabel('matrix stress[MPa]')
-plt.legend()
+# plt.legend()
 plt.show()
 
 

@@ -21,7 +21,7 @@ from scipy.stats import variation
 plt.figure()
 for i in range(4):
     # for i in [3]:
-    homedir = 'D:\\data\\'
+    homedir = 'D:\\data\\Tensile_test_multiple_cracking\\'
     path = [homedir, 'test' + str(i + 1) + '.txt']
     filepath = os.path.join(*path)
     data = np.loadtxt(filepath, delimiter=',')
@@ -44,7 +44,7 @@ plt.plot(np.hstack((0., stress_1, 13.5)), np.hstack((0, np.arange(
 plt.figure()
 for i in range(4):
     # for i in [3]:
-    homedir = 'D:\\data\\'
+    homedir = 'D:\\data\\Tensile_test_multiple_cracking\\'
     path = [homedir, 'test6' + str(i + 1) + '.txt']
     filepath = os.path.join(*path)
     data = np.loadtxt(filepath, delimiter=',')

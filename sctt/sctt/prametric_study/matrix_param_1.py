@@ -24,46 +24,6 @@ from matplotlib import cm
 from scipy.special import gamma
 from scipy.optimize import bisect
 
-home_dir = 'D:\\Eclipse\\'
-path1 = [home_dir, 'git',  # the path of the data file
-         'rostar',
-         'scratch',
-         'diss_figs',
-         'TT-4C-01.txt']
-filepath1 = os.path.join(*path1)
-data = np.loadtxt(filepath1, delimiter=';')
-eps_max = np.amax(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.)
-eps_arr = np.linspace(0, eps_max, 100)
-interp_exp = interp1d(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
-                      data[:, 1] / 2., bounds_error=False, fill_value=0.)
-
-sig_exp = interp_exp(eps_arr)
-
-# plt.plot(eps_arr, sig_exp)
-# plt.show()
-# lack_of_fit = []
-reinf = ContinuousFibers(r=3.5e-3,
-                         tau=RV(
-                             'gamma', loc=0.001260, scale=1.440, shape=0.0539),
-                         V_f=0.01,
-                         E_f=180e3,
-                         xi=fibers_MC(m=6.7, sV0=0.0076),
-                         label='carbon',
-                         n_int=500)
-
-cb = RandomBondCB(E_m=25e3,
-                  reinforcement_lst=[reinf],
-                  n_BC=10,
-                  L_max=300)
-ctt = CompositeTensileTest(n_x=600,
-                           L=300.,
-                           cb=cb)
-
-n = 10
-s_m_arr = np.linspace(2.8, 3.8, n)
-lack_of_fit = np.zeros(n)
-crack_spacing = np.zeros(n)
-
 
 def scale(shape):
     lp = 1.
@@ -72,14 +32,48 @@ def scale(shape):
     f = (lp / (lp + lc)) ** (1. / shape)
     return sig_min / (f * gamma(1. + 1. / shape))
 
-print scale(60.)
 
-k = 5.
-for j in range(int(k)):
-    for i in range(n):
+def cal(k):
 
-        print j, i
+    home_dir = 'D:\\Eclipse\\'
+    path1 = [home_dir, 'git',  # the path of the data file
+             'rostar',
+             'scratch',
+             'diss_figs',
+             'TT-4C-01.txt']
+    filepath1 = os.path.join(*path1)
+    data = np.loadtxt(filepath1, delimiter=';')
+    eps_max = np.amax(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.)
+    eps_arr = np.linspace(0, eps_max, 100)
+    interp_exp = interp1d(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
+                          data[:, 1] / 2., bounds_error=False, fill_value=0.)
 
+    sig_exp = interp_exp(eps_arr)
+
+    reinf = ContinuousFibers(r=3.5e-3,
+                             tau=RV(
+                                 'gamma', loc=0.001260, scale=1.440, shape=0.0539),
+                             V_f=0.01,
+                             E_f=180e3,
+                             xi=fibers_MC(m=6.7, sV0=0.0076),
+                             label='carbon',
+                             n_int=500)
+
+    cb = RandomBondCB(E_m=25e3,
+                      reinforcement_lst=[reinf],
+                      n_BC=10,
+                      L_max=300)
+    ctt = CompositeTensileTest(n_x=600,
+                               L=300.,
+                               cb=cb)
+
+    n = 10
+    s_m_arr = np.linspace(2.8, 3.8, n)
+
+    lack_of_fit = np.zeros(10)
+    crack_spacing = np.zeros(10)
+
+    for i in range(10):
         m_m = bisect(lambda m: scale(m) - s_m_arr[i], 1., 1000.)
 
         print m_m
@@ -104,18 +98,34 @@ for j in range(int(k)):
         lack_of_fit[i] += np.sum((sig_sim - sig_exp) ** 2) / k
         crack_spacing[i] += ctt.L / n_cracks / k
 
-    print [lack_of_fit]
-    print [crack_spacing]
+    return lack_of_fit, crack_spacing
 
-fig, ax1 = plt.subplots()
-ax1.plot(s_m_arr, lack_of_fit, 'k--', label='lack of fit:SCM-TT')
-ax1.ylabel('lack of fit')
-plt.legend(loc='best')
+if __name__ == '__main__':
+
+    from joblib import Parallel, delayed
+    import multiprocessing
+
+    inputs = range(5)
+    num_cores = multiprocessing.cpu_count()
 
 
-ax2 = ax1.twinx()
-ax2.plot(s_m_arr, crack_spacing, 'k', label='crack spacing')
-ax2.xlabel('s_m')
-ax2.ylabel('crack spacing')
-plt.legend(loc='best')
-plt.show()
+#     n = 10
+#     s_m_arr = np.linspace(2.8, 3.8, n)
+
+#     lack_of_fit, crack_spacing = cal(5)
+    results = Parallel(n_jobs=num_cores)(delayed(cal)(5) for i in inputs)
+
+    print results
+
+
+#     fig, ax1 = plt.subplots()
+#     ax1.plot(s_m_arr, lack_of_fit, 'k--', label='lack of fit:SCM-TT')
+#     ax1.ylabel('lack of fit')
+#     plt.legend(loc='best')
+#
+#     ax2 = ax1.twinx()
+#     ax2.plot(s_m_arr, crack_spacing, 'k', label='crack spacing')
+#     ax2.xlabel('s_m')
+#     ax2.ylabel('crack spacing')
+#     plt.legend(loc='best')
+#     plt.show()

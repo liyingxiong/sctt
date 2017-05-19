@@ -55,11 +55,12 @@ def plot_m_s(s_tau, m_tau, l_tau, w_arr, sig_w):
 
     plt.figure(figsize=(12, 9))
     im = plt.imshow(delta, interpolation='bilinear', origin='lower',
-                    cmap=cm.gray, extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * s_tau, 1.25 * s_tau), aspect=m_tau / s_tau)
+                    cmap=cm.gray_r, extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * s_tau, 1.25 * s_tau), aspect=m_tau / s_tau)
     levels = np.arange(0, 10, 0.2)
     CS = plt.contour(delta, levels,
                      origin='lower',
                      linewidths=1,
+                     cmap=cm.gray,
                      extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * s_tau, 1.25 * s_tau))
     plt.clabel(CS, levels[1::2],  # label every second level
                inline=1,
@@ -68,7 +69,7 @@ def plot_m_s(s_tau, m_tau, l_tau, w_arr, sig_w):
     # CB = plt.colorbar(CS, shrink=0.8, extend='both')
 
     plt.title('lack of fit')
-    plt.flag()
+#     plt.flag()
 
     CBI = plt.colorbar(im, shrink=0.8)
 
@@ -120,11 +121,12 @@ def plot_m_l(s_tau, m_tau, l_tau, w_arr, sig_w):
 
     plt.figure(figsize=(12, 9))
     im = plt.imshow(delta, interpolation='bilinear', origin='lower',
-                    cmap=cm.gray, extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * l_tau, 1.25 * l_tau), aspect=m_tau / l_tau)
+                    cmap=cm.gray_r, extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * l_tau, 1.25 * l_tau), aspect=m_tau / l_tau)
     levels = np.arange(0, 10, 0.2)
     CS = plt.contour(delta, levels,
                      origin='lower',
                      linewidths=1,
+                     cmap=cm.gray,
                      extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * l_tau, 1.25 * l_tau))
     plt.clabel(CS, levels[1::2],  # label every second level
                inline=1,
@@ -133,12 +135,12 @@ def plot_m_l(s_tau, m_tau, l_tau, w_arr, sig_w):
     # CB = plt.colorbar(CS, shrink=0.8, extend='both')
 
     plt.title('lack of fit')
-    plt.flag()
+#     plt.flag()
 
     CBI = plt.colorbar(im, shrink=0.8)
 
-    plt.plot(m_tau, l_tau, 'ro')
-    plt.plot((0.75 * m_tau, 1.25 * m_tau), (0.00126, 0.00126), '--')
+    plt.plot(m_tau, l_tau, 'ko')
+#     plt.plot((0.75 * m_tau, 1.25 * m_tau), (0.00126, 0.00126), '--')
     plt.xlabel('m_tau')
     plt.ylabel('l_tau')
     path = 'D:\\fig\\m_l'
@@ -206,8 +208,8 @@ def plot_s_l(s_tau, m_tau, l_tau, w_arr, sig_w):
 
     CBI = plt.colorbar(im, shrink=0.8)
 
-    plt.plot(s_tau, l_tau, 'ro')
-    plt.plot((0.75 * s_tau, 1.25 * s_tau), (0.00126, 0.00126), '--')
+    plt.plot(s_tau, l_tau, 'ko')
+#     plt.plot((0.75 * s_tau, 1.25 * s_tau), (0.00126, 0.00126), '--')
     plt.xlabel('s_tau')
     plt.ylabel('l_tau')
     path = 'D:\\fig\\s_l'
@@ -235,6 +237,6 @@ if __name__ == '__main__':
             test_xdata, test_ydata, bounds_error=False, fill_value=0.)
         sig_w += 0.2 * interp(w_arr)
 
-    plot_s_l(1.440, 0.0539, 0.001260, w_arr, sig_w)
+    plot_m_s(1.440, 0.0539, 0.001260, w_arr, sig_w)
 
     plt.show()

@@ -35,7 +35,6 @@ eps_max = np.amax(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.)
 eps_arr = np.linspace(0, eps_max, 100)
 interp_exp = interp1d(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
                       data[:, 1] / 2., bounds_error=False, fill_value=0.)
-
 sig_exp = interp_exp(eps_arr)
 
 # plt.plot(eps_arr, sig_exp)
@@ -64,9 +63,6 @@ m_m_arr = np.linspace(10, 100, n)
 X, Y = np.meshgrid(s_m_arr, m_m_arr)
 lack_of_fit = np.zeros((n, n))
 crack_spacing = np.zeros((n, n))
-
-print m_m_arr
-
 
 for i in range(n):
     for j in range(n):

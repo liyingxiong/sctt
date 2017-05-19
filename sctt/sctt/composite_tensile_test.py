@@ -154,7 +154,6 @@ class CompositeTensileTest(HasStrictTraits):
         BC_x_lst.append(np.array(self.BC_x))
 
         t1 = t.time()
-        print 'begin', t1
         # determine the following cracking load factors
         while True:
             sig_c_i, y_i = self.get_sig_c_i(sig_c_lst[-1])
@@ -168,7 +167,6 @@ class CompositeTensileTest(HasStrictTraits):
             BC_x_lst.append(np.array(self.BC_x))
 #             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
 #             print 'strength', self.strength
-        print 'time consumed', t.time() - t1
         print 'cracking history determined'
         sig_c_u = self.strength
         print sig_c_u
@@ -377,11 +375,12 @@ class CompositeTensileTest(HasStrictTraits):
 # output
 #=============================================================================
 if __name__ == '__main__':
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
+    #     plt.rc('text', usetex=True)
+    #     plt.rc('font', family='serif')
 
     home_dir = 'D:\\Eclipse\\'
     for i in range(5):
+        #     for i in [0]:
         #     for i in [2]:
         path1 = [home_dir, 'git',  # the path of the data file
                  'rostar',
@@ -397,9 +396,9 @@ if __name__ == '__main__':
                  'TT-6C-0' + str(i + 1) + '.txt']
         filepath2 = os.path.join(*path2)
 
-        data = np.loadtxt(filepath1, delimiter=';')
-        plt.plot(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
-                 data[:, 1] / 2., lw=1, color='0.5')
+#         data = np.loadtxt(filepath1, delimiter=';')
+#         plt.plot(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
+#                  data[:, 1] / 2., lw=1, color='0.5')
         data = np.loadtxt(filepath2, delimiter=';')
         plt.plot(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
                  data[:, 1] / 2., lw=1, color='0.5')
@@ -408,39 +407,39 @@ if __name__ == '__main__':
 #     plt.legend(loc='best')
 #     plt.show()
 
-    from calibration.tau_strength_dependence import interp_tau_shape, interp_tau_scale
-    from calibration.matrix_strength_dependence import interp_m_shape
-
-#     s= 0.008689444790342452*1.0
-    s_arr = np.array(
-        [0.00923835,  0.00979774,  0.01029609,  0.01075946,  0.01117243, 0.01154383])
-
-    s = s_arr[0]
-    m = 6.
-
-    shape = interp_tau_shape(s, m)
-    scale = interp_tau_scale(s, m)
-#     shape = 0.0718309208735*1.0
-#     scale = 1.12965815478*1.0
-
-#     shape = 0.0479314809805 * 1.5
-#     scale = 2.32739332143
-
-    print shape, scale
+#     from calibration.tau_strength_dependence import interp_tau_shape, interp_tau_scale
+#     from calibration.matrix_strength_dependence import interp_m_shape
+#
+# s= 0.008689444790342452*1.0
+#     s_arr = np.array(
+#         [0.00923835,  0.00979774,  0.01029609,  0.01075946,  0.01117243, 0.01154383])
+#
+#     s = s_arr[0]
+#     m = 6.
+#
+#     shape = interp_tau_shape(s, m)
+#     scale = interp_tau_scale(s, m)
+# shape = 0.0718309208735*1.0
+# scale = 1.12965815478*1.0
+#
+# shape = 0.0479314809805 * 1.5
+# scale = 2.32739332143
+#
+#     print shape, scale
 
     reinf1 = ContinuousFibers(r=3.5e-3,
                               tau=RV(
-                                  'gamma', loc=0., scale=2.276, shape=0.0505),
+                                  'gamma', loc=0.00126, scale=1.440, shape=0.0539),
                               V_f=0.01,
                               E_f=180e3,
-                              xi=fibers_MC(m=8.806, sV0=0.0134),
+                              xi=fibers_MC(m=6.7, sV0=0.0076),
                               label='carbon',
                               n_int=500)
 
     cb = RandomBondCB(E_m=25e3,
                       reinforcement_lst=[reinf1],
-                      n_BC=8,
-                      L_max=120.)
+                      n_BC=10,
+                      L_max=200.)
 
     random_field = RandomField(seed=False,
                                lacor=1.,
@@ -448,8 +447,8 @@ if __name__ == '__main__':
                                nx=1000,
                                nsim=1,
                                loc=.0,
-                               shape=45.,
-                               scale=3.599,
+                               shape=60.,
+                               scale=3.1,
                                distr_type='Weibull')
 
     ctt = CompositeTensileTest(n_x=1000,
@@ -459,16 +458,16 @@ if __name__ == '__main__':
 
     sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history()
 #     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
-    print '1.0%', [sig_c_i]
+    print '1.5%', [sig_c_i]
     print np.sort(ctt.y)
 
-    load_arr = np.unique(np.hstack((np.linspace(0, 30, 100), sig_c_i)))
+    load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
 #     damage_arr = ctt.get_damage_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
     crack_eps = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, sig_c_i)
 
-    plt.plot(eps_c_arr, load_arr, 'k', lw=2, label='$v_\mathrm{f}=1.0\%$')
-    plt.plot(crack_eps, sig_c_i, 'ko')
+    plt.plot(eps_c_arr, load_arr, 'k', lw=2, label='v_f=1.5%')
+#     plt.plot(crack_eps, sig_c_i, 'ko')
 
 
 #     for i, load in enumerate(load_arr):

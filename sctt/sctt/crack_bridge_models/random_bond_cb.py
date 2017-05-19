@@ -1,4 +1,4 @@
-from enthought.traits.api import HasTraits, Array, Instance, List, Float, Int, \
+from traits.api import HasTraits, Array, List, Float, Int, \
     Property, cached_property
 from util.traits.either_type import EitherType
 from types import FloatType
@@ -543,8 +543,8 @@ class RandomBondCB(HasTraits):
                         x_arr_record, sigc_record, sigm_record)
 #                     interp_damage = interp1d(sigc_record, damage_record, bounds_error=False, fill_value=damage_record[-1])
 
-                    print ((j + 1) * j / 2 + q + 1) * 100 / \
-                        (self.n_BC * (self.n_BC + 1) / 2), '%'
+#                     print ((j + 1) * j / 2 + q + 1) * 100 / \
+#                         (self.n_BC * (self.n_BC + 1) / 2), '%'
 
                     interps_epsf.append(interp_epsf)
                     interps_sigm.append(interp_sigm)
