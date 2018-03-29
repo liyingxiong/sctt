@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>sctt</name>
+	<comment></comment>
+	<projects>
+		<project>aramis_cdt</project>
+		<project>BMC_apps</project>
+		<project>bmcs</project>
+		<project>cbfe</project>
+		<project>debontrix</project>
+		<project>etsproxy</project>
+		<project>fragmentrix</project>
+		<project>ibvpy</project>
+		<project>mathkit</project>
+		<project>matresdev</project>
+		<project>mxn</project>
+		<project>mxnix</project>
+		<project>oricreate</project>
+		<project>project</project>
+		<project>Pyiiout</project>
+		<project>quaducom</project>
+		<project>rostar</project>
+		<project>scratch</project>
+		<project>screenmix</project>
+		<project>spirrid</project>
+		<project>ssm</project>
+		<project>stats</project>
+		<project>util</project>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.python.pydev.PyDevBuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.python.pydev.pythonNature</nature>
+	</natures>
+</projectDescription>

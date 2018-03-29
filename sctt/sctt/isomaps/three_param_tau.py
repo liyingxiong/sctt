@@ -48,15 +48,15 @@ def plot_m_s(s_tau, m_tau, l_tau, w_arr, sig_w):
     delta = np.zeros((n, n))
 
     for i in range(n):
+        print i
         for j in range(n):
-            print j
             delta[i, j] = lackoffit(
                 X[i, j], Y[i, j], l_tau, w_arr, sig_w)
 
     plt.figure(figsize=(12, 9))
     im = plt.imshow(delta, interpolation='bilinear', origin='lower',
                     cmap=cm.gray_r, extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * s_tau, 1.25 * s_tau), aspect=m_tau / s_tau)
-    levels = np.arange(0, 10, 0.2)
+    levels = np.hstack((np.array([0.2, 0.4, 0.6, 0.8]), np.arange(1, 20, 1.0)))
     CS = plt.contour(delta, levels,
                      origin='lower',
                      linewidths=1,
@@ -114,15 +114,16 @@ def plot_m_l(s_tau, m_tau, l_tau, w_arr, sig_w):
     delta = np.zeros((n, n))
 
     for i in range(n):
+        print i
         for j in range(n):
-            print j
             delta[i, j] = lackoffit(
                 X[i, j], s_tau, Y[i, j], w_arr, sig_w)
 
     plt.figure(figsize=(12, 9))
     im = plt.imshow(delta, interpolation='bilinear', origin='lower',
                     cmap=cm.gray_r, extent=(0.75 * m_tau, 1.25 * m_tau, 0.75 * l_tau, 1.25 * l_tau), aspect=m_tau / l_tau)
-    levels = np.arange(0, 10, 0.2)
+#     levels = np.arange(0, 10, 0.2)
+    levels = np.hstack((np.array([0.2, 0.4, 0.6, 0.8]), np.arange(1, 20, 1.0)))
     CS = plt.contour(delta, levels,
                      origin='lower',
                      linewidths=1,
@@ -237,6 +238,6 @@ if __name__ == '__main__':
             test_xdata, test_ydata, bounds_error=False, fill_value=0.)
         sig_w += 0.2 * interp(w_arr)
 
-    plot_m_s(1.440, 0.0539, 0.001260, w_arr, sig_w)
+    plot_m_l(1.440, 0.0539, 0.001260, w_arr, sig_w)
 
     plt.show()

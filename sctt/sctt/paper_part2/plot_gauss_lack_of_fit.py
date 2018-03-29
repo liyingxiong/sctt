@@ -30,7 +30,7 @@ m = np.linspace(0.03, 0.45, 100)
 
 cs = smooth_cs(s, m)
 
-filename = 'D:\\data\\Tensile_test_multiple_cracking\\gauss\\lof_avg.txt'
+filename = 'D:\\data\\Tensile_test_multiple_cracking\\gauss\\lof5.txt'
 
 a = np.loadtxt(filename)
 lof = np.reshape(a, (12, 12))

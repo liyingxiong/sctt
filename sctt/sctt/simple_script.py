@@ -9,7 +9,7 @@ T = 12.  # bond intensity
 sig_cu = 18.  # [MPa]
 L = 1000.
 x = np.linspace(0, L, 1000)  # specimen discretization
-sig_mu_x = np.linspace(3.0, 4.5, 1000)  # matrix strength field
+sig_mu_x = np.linspace(3.0, 3.00000001, 1000)  # matrix strength field
 
 
 def cb(z, sig_c):  # Eq.(3) and Eq. (9)

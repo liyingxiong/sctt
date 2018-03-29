@@ -159,7 +159,7 @@ class CompositeTensileTest(HasStrictTraits):
             sig_c_i, y_i = self.get_sig_c_i(sig_c_lst[-1])
             if sig_c_i >= self.strength or sig_c_i == 1e6:
                 break
-            print sig_c_i, y_i
+#             print sig_c_i, y_i
             self.y.append(y_i)
             print 'number of cracks:', len(self.y)
             sig_c_lst.append(sig_c_i)
@@ -169,7 +169,7 @@ class CompositeTensileTest(HasStrictTraits):
 #             print 'strength', self.strength
         print 'cracking history determined'
         sig_c_u = self.strength
-        print sig_c_u
+        print 'composite strength', sig_c_u
         n_cracks = len(self.y)
         self.y = []
         return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst, sig_c_u, n_cracks

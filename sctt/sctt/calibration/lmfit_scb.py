@@ -8,7 +8,7 @@ import numpy as np
 import os
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
-from spirrid.rv import RV
+# from spirrid.rv import RV
 from math import pi
 import time as t
 from scipy.special import gamma
@@ -16,7 +16,7 @@ from scipy.special import gamma
 # for w_max in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0]:
 # for s_f in [0.006, 0.007, 0.008, 0.009, 0.01, 0.011, 0.012]:
 # experimental data to be fitted
-w_arr = np.linspace(0., 0.8, 100)
+w_arr = np.linspace(0., 1.0, 100)
 sig_w = np.zeros_like(w_arr)
 home_dir = 'D:\\Eclipse\\'
 for i in np.array([1, 2, 3, 4, 5]):
@@ -34,6 +34,10 @@ for i in np.array([1, 2, 3, 4, 5]):
     interp = interp1d(
         test_xdata, test_ydata, bounds_error=False, fill_value=0.)
     sig_w += 0.2 * interp(w_arr)
+
+
+plt.plot(w_arr, sig_w)
+plt.show()
 
 
 def fcn2min(params, x, data):

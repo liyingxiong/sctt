@@ -17,7 +17,7 @@ from scipy.special import gamma
 # 2.2, 2.6, 3.0]:
 # for m1 in [6., 7., 8., 9., 10.]:
 w_max = 1.0
-w_arr = np.linspace(0., 1.0, 100)
+w_arr = np.linspace(0., 1.0, 1000)
 sig_w = np.zeros_like(w_arr)
 home_dir = 'D:\\Eclipse\\'
 for i in np.array([1, 2, 3, 4, 5]):
@@ -34,11 +34,39 @@ for i in np.array([1, 2, 3, 4, 5]):
     test_ydata = cb[:, 1]
     interp = interp1d(
         test_xdata, test_ydata, bounds_error=False, fill_value=0.)
+#     plt.plot(w_arr, interp(w_arr), 'k', alpha=0.5)
     sig_w += 0.2 * interp(w_arr)
 
 
+def response(shape, scale, loc, x):
+
+    sV0 = 0.0076
+    m = 6.7
+
+    tau = RV('gamma', shape=shape, scale=scale, loc=loc)
+    n_int = 500
+    p_arr = np.linspace(0.5 / n_int, 1 - 0.5 / n_int, n_int)
+    tau_arr = tau.ppf(p_arr) + 1e-10
+    r = 3.5e-3
+    E_f = 180e3
+    T = 2. * tau_arr / r
+    # scale parameter with respect to a reference volume
+    s = ((T * (m + 1.) * sV0 ** m) /
+         (2. * E_f * pi * r ** 2)) ** (1. / (m + 1.))
+    ef0 = np.sqrt(x[:, np.newaxis] * T[np.newaxis, :] / E_f)
+    Gxi = 1 - np.exp(-(ef0 / s) ** (m + 1.))
+    mu_int = ef0 * (1 - Gxi)
+    sigma = mu_int * E_f
+
+    return np.sum(sigma, axis=1) / n_int * (11. * 0.445) / 1000
+
+plt.plot(w_arr, sig_w, '--')
+sig_model = response(54e-3, 1.44, 12.6e-4, w_arr)
+plt.plot(w_arr, sig_model)
+plt.show()
+
+
 def fcn2min(params, x, data):
-    """ model decaying sine wave, subtract data"""
     shape = params['shape'].value
     scale = params['scale'].value
     loc = params['loc'].value
@@ -52,7 +80,7 @@ def fcn2min(params, x, data):
     p_arr = np.linspace(0.5 / n_int, 1 - 0.5 / n_int, n_int)
     tau_arr = tau.ppf(p_arr) + 1e-10
     r = 3.5e-3
-    E_f = 180e3
+    E_f = 182e3
     T = 2. * tau_arr / r
     # scale parameter with respect to a reference volume
     s = ((T * (m + 1.) * sV0 ** m) /
