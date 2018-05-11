@@ -53,7 +53,7 @@ reinf = ContinuousFibers(r=3.5e-3,
                              'gamma', loc=0.001260, scale=1.440, shape=0.0539),
                          V_f=0.01,
                          E_f=180e3,
-                         xi=fibers_MC(m=6.7, sV0=0.0076),
+                         xi=fibers_MC(m=10000., sV0=0.0076),
                          label='carbon',
                          n_int=500)
 cb = RandomBondCB(E_m=25e3,
@@ -70,33 +70,33 @@ stdev_arr = np.array([0.10, 0.15, 0.15, 0.25, 0.08])
 # stdev_arr = np.array([0.1])
 #
 #
-# for m, s in zip(mean_arr, stdev_arr):
-#
-#     random_field = RandomField(seed=False,
-#                                lacor=1.,
-#                                length=500.,
-#                                nx=1000,
-#                                nsim=1,
-#                                mean=m,
-#                                stdev=s,
-#                                distr_type='Gauss')
-#
-#     ctt.sig_mu_x = random_field.random_field
-#
-#     sig_c_i, z_x_i, BC_x_i, sig_c_u, n_cracks = ctt.get_cracking_history()
-#     load_arr = np.linspace(0, sig_c_u, 100)
-#     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
-#     ax1.plot(eps_c_arr, load_arr, lw=2)
-#
-#     cs = 500. / (np.arange(len(z_x_i)) + 1)
-#     cs[cs > 120.] = 120.
-#     cs = np.hstack((cs, cs[-1]))
-#
-#     eps_c_i = np.interp(np.hstack((sig_c_i, sig_c_u)), load_arr, eps_c_arr)
-#     ax2.plot(eps_c_i, cs, drawstyle='steps', lw=2)
-#
-#     print 'cs', cs[-1]
-#     print '===================='
+for m, s in zip(mean_arr, stdev_arr):
+
+    random_field = RandomField(seed=False,
+                               lacor=1.,
+                               length=500.,
+                               nx=1000,
+                               nsim=1,
+                               mean=m,
+                               stdev=s,
+                               distr_type='Gauss')
+
+    ctt.sig_mu_x = random_field.random_field
+
+    sig_c_i, z_x_i, BC_x_i, sig_c_u, n_cracks = ctt.get_cracking_history()
+    load_arr = np.linspace(0, sig_c_u, 100)
+    eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
+    ax1.plot(eps_c_arr, load_arr, lw=2)
+
+    cs = 500. / (np.arange(len(z_x_i)) + 1)
+    cs[cs > 120.] = 120.
+    cs = np.hstack((cs, cs[-1]))
+
+    eps_c_i = np.interp(np.hstack((sig_c_i, sig_c_u)), load_arr, eps_c_arr)
+    ax2.plot(eps_c_i, cs, drawstyle='steps', lw=2)
+
+    print 'cs', cs[-1]
+    print '===================='
 
 # =========================================================================
 # 1% aramis
