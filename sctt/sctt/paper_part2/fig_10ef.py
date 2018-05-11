@@ -53,7 +53,7 @@ reinf = ContinuousFibers(r=3.5e-3,
                              'gamma', loc=0.001260, scale=1.440, shape=0.0539),
                          V_f=0.01,
                          E_f=180e3,
-                         xi=fibers_MC(m=10000., sV0=0.0076),
+                         xi=fibers_MC(m=6.7, sV0=0.0076),
                          label='carbon',
                          n_int=500)
 cb = RandomBondCB(E_m=25e3,
