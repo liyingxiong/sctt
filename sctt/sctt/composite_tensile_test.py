@@ -171,6 +171,8 @@ class CompositeTensileTest(HasStrictTraits):
         sig_c_u = self.strength
         print 'composite strength', sig_c_u
         n_cracks = len(self.y)
+        print [np.array(sig_c_lst)]
+        print [np.array(self.y)]
         self.y = []
         return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst, sig_c_u, n_cracks
 
