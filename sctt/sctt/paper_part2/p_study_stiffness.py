@@ -3,26 +3,26 @@ Created on 11.05.2018
 
 @author: Yingxiong
 '''
-from crack_bridge_models.random_bond_cb import RandomBondCB
+from sctt.crack_bridge_models.random_bond_cb import RandomBondCB
 import numpy as np
 from scipy.interpolate import interp1d
 import os.path
-from reinforcements.fiber_bundle import FiberBundle
+from sctt.reinforcements.fiber_bundle import FiberBundle
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
-from composite_tensile_test import CompositeTensileTest
+from sctt.composite_tensile_test import CompositeTensileTest
 import matplotlib.pyplot as plt
 from stats.misc.random_field.random_field_1D import RandomField
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
 from spirrid.rv import RV
-from calibration.matrix_strength_dependence import interp_m_shape
+from sctt.calibration.matrix_strength_dependence import interp_m_shape
 home_dir = 'D:\\Eclipse\\'
 
 ax1 = plt.subplot(122)
 ax2 = plt.subplot(121)
 
-load_exp_curves = True
+load_exp_curves = False
 if load_exp_curves:
 
     for i in range(5):

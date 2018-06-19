@@ -6,7 +6,7 @@ from spirrid.rv import RV
 from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement import \
     ContinuousFibers
-from reinforcements.fiber_bundle import FiberBundle
+from sctt.reinforcements.fiber_bundle import FiberBundle
 import numpy as np
 from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg, fsolve, \
     broyden2, broyden1, newton_krylov, basinhopping, minimize_scalar
