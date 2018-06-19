@@ -1,21 +1,21 @@
+from types import FloatType
+
+from matplotlib import pyplot as plt
+from scipy.integrate import cumtrapz
+from scipy.interpolate import interp1d, interp2d, griddata, LinearNDInterpolator
+from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg, fsolve, \
+    broyden2, broyden1, newton_krylov, basinhopping, minimize_scalar
 from traits.api import HasTraits, Array, Instance, List, Float, Int, \
     Property, cached_property
 from util.traits.either_type import EitherType
-from types import FloatType
-from spirrid.rv import RV
-from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
+
+import numpy as np
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement import \
     ContinuousFibers
 from reinforcements.fiber_bundle import FiberBundle
-import numpy as np
-from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg, fsolve, \
-    broyden2, broyden1, newton_krylov, basinhopping, minimize_scalar
-from scipy.integrate import cumtrapz
+from spirrid.rv import RV
+from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
 import time as t
-from matplotlib import pyplot as plt
-from scipy.interpolate import interp1d, interp2d, griddata, LinearNDInterpolator
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
 
 
 class RandomBondCB(HasTraits):
@@ -423,7 +423,8 @@ class RandomBondCB(HasTraits):
     def max_sig_c(self, Ll, Lr):  # need further improvement
         self.Ll = Ll
         self.Lr = Lr
-        minus_sig_c = lambda w: -self.sig_c(w)
+
+        def minus_sig_c(w): return -self.sig_c(w)
         w_upper_bound = min(0.1 * (self.Ll + self.Lr), 20)
         # determine the bound for fminbound
         mid = brute(self.minus_sig_c, ((1e-3, w_upper_bound),), Ns=10,
@@ -561,6 +562,7 @@ class RandomBondCB(HasTraits):
     def get_index(self, Ll, Lr):
         # find the index of the interpolator corresponding to the BC
         l, r = np.sort([Ll, Lr])
+        print l, r
         i = min(np.sum(self.BC_range - l < 0), self.n_BC - 1)
         j = min(np.sum(self.BC_range - r < 0), self.n_BC - 1)
         return (j + 1) * j / 2 + i
@@ -582,6 +584,7 @@ class RandomBondCB(HasTraits):
             return f(z, load)
         v = np.vectorize(get_sig_m_i)
         return v(self, z_arr, Ll_arr, Lr_arr, load)
+
 
 if __name__ == '__main__':
 
@@ -614,7 +617,7 @@ if __name__ == '__main__':
     z_arr = np.linspace(0, 150, 300)
     Ll_arr = 150. * np.ones_like(z_arr)
     Lr_arr = 5. * np.ones_like(z_arr)
-    for load in [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]:
+    for load in [1.5, 2.0]:  # , 2.5, 3.0, 3.5, 4.0, 4.5]:
         sig_m = ccb.get_sig_m_z(z_arr, Ll_arr, Lr_arr, load)
         plt.plot(z_arr, sig_m, label='load=' + str(load))
     plt.xlim((0, 120))
