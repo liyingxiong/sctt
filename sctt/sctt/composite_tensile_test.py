@@ -1,4 +1,4 @@
-from etsproxy.traits.api import \
+from traits.api import \
     HasStrictTraits, Instance, Int, Float, List, Array, Property, \
     cached_property
 import numpy as np
@@ -8,7 +8,7 @@ from random_fields.simple_random_field import SimpleRandomField
 from crack_bridge_models.constant_bond_cb import ConstantBondCB
 from crack_bridge_models.representative_cb import RepresentativeCB
 from util.traits.either_type import EitherType
-from etsproxy.traits.ui.api import \
+from traitsui.api import \
     View, Item, Group
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
