@@ -3,20 +3,26 @@ Created on 11.05.2018
 
 @author: Yingxiong
 '''
-from sctt.crack_bridge_models.random_bond_cb import RandomBondCB
-import numpy as np
-from scipy.interpolate import interp1d
 import os.path
-from sctt.reinforcements.fiber_bundle import FiberBundle
-from stats.pdistrib.weibull_fibers_composite_distr import \
-    WeibullFibers, fibers_MC
-from sctt.composite_tensile_test import CompositeTensileTest
+
+from scipy.interpolate import interp1d
+
 import matplotlib.pyplot as plt
-from stats.misc.random_field.random_field_1D import RandomField
+import numpy as np
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
-from spirrid.rv import RV
+import scipy.stats as stats
 from sctt.calibration.matrix_strength_dependence import interp_m_shape
+from sctt.composite_tensile_test import CompositeTensileTest
+from sctt.crack_bridge_models.random_bond_cb import RandomBondCB
+from sctt.reinforcements.fiber_bundle import FiberBundle
+from spirrid.rv import RV
+from stats.misc.random_field.random_field_1D import RandomField
+from stats.pdistrib.weibull_fibers_composite_distr import \
+    WeibullFibers, fibers_MC
+import traits.api as tr
+
+
 home_dir = 'D:\\Eclipse\\'
 
 ax1 = plt.subplot(122)
@@ -55,9 +61,29 @@ if load_exp_curves:
 # simulation
 
 
+class RVBeta(RV):
+    a = tr.Float(0.05)
+    b = tr.Float(0.6)
+    loc = tr.Float(1e-4)
+    scale = tr.Float(1.44)
+
+    def __init__(self, type, loc=0.0, scale=0.0, shape=1.0,
+                 *args, **kw):
+        pass
+
+    def ppf(self, x):
+        return stats._continuous_distns.beta.ppf(x, self.a, self.b,
+                                                 loc=self.loc, scale=self.scale)
+
+
+rv_beta = RVBeta('beta')
+
+
 def plot_eps_sig_cs(m_fiber, vf, mean, stdev):
     # specify the model parameters
     reinf = ContinuousFibers(r=3.5e-3,
+                             #                              tau=RVBeta(
+                             #                                  'beta'),
                              tau=RV(
                                  'gamma', loc=0.001260, scale=0.2 * 1.440, shape=0.0539),
                              V_f=vf,
@@ -86,6 +112,7 @@ def plot_eps_sig_cs(m_fiber, vf, mean, stdev):
 
     sig_c_i, z_x_i, BC_x_i, sig_c_u, n_cracks = ctt.get_cracking_history()
     load_arr = np.linspace(0, sig_c_u, 100)
+    print 'BC_x_i', BC_x_i
     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
 
     cs = 500. / (np.arange(len(z_x_i)) + 1)

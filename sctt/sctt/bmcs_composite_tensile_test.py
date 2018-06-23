@@ -8,17 +8,13 @@ from scipy.optimize import brentq, minimize_scalar, fmin, brute, newton
 from scipy.stats import gamma as gam
 from traits.api import \
     HasStrictTraits, Instance, Int, Float, List, Array, Property, \
-    cached_property, Bool
-import numpy as np
-from scipy.interpolate import interp1d
-from scipy.optimize import brentq, minimize_scalar, fmin, brute, newton
-from random_fields.simple_random_field import SimpleRandomField
-from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.representative_cb import RepresentativeCB
-from util.traits.either_type import EitherType
+    cached_property
 from traitsui.api import \
     View, Item, Group
 from util.traits.either_type import EitherType
+from view.plot2d import Viz2D, Vis2D
+from view.ui import BMCSLeafNode
+from view.window import BMCSModel, BMCSWindow, TLine
 
 from crack_bridge_models.constant_bond_cb import ConstantBondCB
 from crack_bridge_models.random_bond_cb import RandomBondCB
@@ -35,13 +31,108 @@ from stats.misc.random_field.random_field_1D import RandomField
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
 import time as t
+import traits.api as tr
+
+
 # from calibration import Calibration
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
-class CompositeTensileTest(HasStrictTraits):
-    
-    save_cracking = Bool(False)
+class Viz2DSigEps(Viz2D):
+    '''Plot adaptor for the pull-out simulator.
+    '''
+    label = 'sig-eps'
+
+    def plot(self, ax, vot, *args, **kw):
+        sig_t = self.vis2d.get_sig_c_t()
+        ymin, ymax = np.min(sig_t), np.max(sig_t)
+        L_y = ymax - ymin
+        ymax += 0.05 * L_y
+        ymin -= 0.0 * L_y
+        eps_t = self.vis2d.get_eps_c_t()
+        xmin, xmax = np.min(eps_t), np.max(eps_t)
+        L_x = xmax - xmin
+        xmax += 0.03 * L_x
+        xmin -= 0.0 * L_x
+        ax.plot(eps_t, sig_t, linewidth=2, color='black', alpha=0.4,
+                label='sig(eps)')
+        ax.plot(eps_t, sig_t, "bo")
+        ax.set_ylim(ymin=ymin, ymax=ymax)
+        ax.set_xlim(xmin=xmin, xmax=xmax)
+        ax.set_ylabel('composite stress [MPa]')
+        ax.set_xlabel('composite strain [-]')
+
+        E_f = self.vis2d.E_f
+        V_f = self.vis2d.V_f
+
+        sig_f = V_f * E_f * eps_t[-1]
+        ax.plot([0, eps_t[-1]], [0, sig_f], 'g-')
+        # plot marker
+        idx = self.vis2d.get_time_idx(vot)
+        eps_idx = eps_t[idx]
+        ax.plot([eps_idx, eps_idx], [ymin, ymax], color='red')
+        ax.legend(loc=4)
+
+    def plot_tex(self, ax, vot):
+        self.plot(ax, vot)
+
+
+class Viz2DStateVarField(Viz2D):
+    '''Plot adaptor for the pull-out simulator.
+    '''
+    label = Property(depends_on='plot_fn')
+
+    @cached_property
+    def _get_label(self):
+        return 'field: %s' % self.plot_fn
+
+    plot_fn = tr.Trait('sig_m',
+                       {'eps': 'plot_eps',
+                        'sig_m': 'plot_sig_m',
+                        'u': 'plot_u',
+                        'sf': 'plot_sf',
+                        },
+                       label='Field',
+                       tooltip='Select the field to plot'
+                       )
+
+    def plot(self, ax, vot, *args, **kw):
+        ymin, ymax = getattr(self.vis2d, self.plot_fn_)(ax, vot, *args, **kw)
+        if self.adaptive_y_range:
+            if self.initial_plot:
+                self.y_max = ymax
+                self.y_min = ymin
+                self.initial_plot = False
+                return
+        self.y_max = max(ymax, self.y_max)
+        self.y_min = min(ymin, self.y_min)
+        ax.set_ylim(ymin=self.y_min, ymax=self.y_max)
+
+    y_max = Float(1.0, label='Y-max value',
+                  auto_set=False, enter_set=True)
+    y_min = Float(0.0, label='Y-min value',
+                  auto_set=False, enter_set=True)
+
+    adaptive_y_range = tr.Bool(True)
+    initial_plot = tr.Bool(True)
+
+    traits_view = View(
+        Item('plot_fn'),
+        Item('y_min', ),
+        Item('y_max', )
+    )
+
+
+class CompositeTensileTest(BMCSModel, Vis2D):
+
+    node_name = 'composite tensile test'
+
+    tree_node_list = List([])
+
+    def _tree_node_list_default(self):
+
+        return [
+        ]
 
     cb = EitherType(klasses=[ConstantBondCB,
                              RandomBondCB])  # crack bridge model
@@ -49,8 +140,8 @@ class CompositeTensileTest(HasStrictTraits):
     #=========================================================================
     # Discretization of the specimen
     #=========================================================================
-    n_x = Int(501)  # number of material points
-    L = Float(1000.)  # the specimen length - mm
+    n_x = Int(501, MESH=True)  # number of material points
+    L = Float(1000, GEO=True)  # the specimen length - mm
     x = Property(depends_on='n_x, L')  # coordinates of the material points
 
     @cached_property
@@ -73,7 +164,7 @@ class CompositeTensileTest(HasStrictTraits):
             z_grid = np.abs(self.x[:, np.newaxis] - y[np.newaxis, :])
             return np.amin(z_grid, axis=1)
         except ValueError:  # no cracks exist
-            return np.ones_like(self.x) * 2. * self.L
+            return np.ones_like(self.x) * 2 * self.L
 
     BC_x = Property(depends_on='x, y')
     '''the array containing the boundary condition for each material point
@@ -111,7 +202,6 @@ class CompositeTensileTest(HasStrictTraits):
             v = np.vectorize(self.cb.get_index)
             ind = v(L_left, L_right)
             return np.amin(self.cb.interps[2][ind])
-#             return self.experimental_strength
 
     #=========================================================================
     # Determine the cracking load level
@@ -144,67 +234,137 @@ class CompositeTensileTest(HasStrictTraits):
         sig_c_i = sig_c_x_i[y_idx]
         return sig_c_i, y_i
 
+    z_x_lst = tr.List
+    sig_m_x_lst = tr.List
+    sig_c_lst = tr.List
+    eps_c_lst = tr.List
+    cc_lst = tr.List
+
+    def get_sig_c_t(self):
+        return np.array(self.sig_c_lst, dtype=np.float_)
+
+    def get_eps_c_t(self):
+        return np.array(self.eps_c_lst, dtype=np.float_)
+
+    def _init_state_arrays(self):
+        self.z_x_lst = []
+        self.sig_m_x_lst = []
+        self.sig_c_lst = []
+        self.eps_c_lst = []
+        self.cc_lst = []
     #=========================================================================
     # determine the crack history
     #=========================================================================
+
+    def init(self):
+        if self._paused:
+            self._paused = False
+        if self._restart:
+            self.tline.val = self.tline.min
+            self.tline.max = 1
+            self._restart = False
+            self._init_state_arrays()
+
+    def eval(self):
+        self.get_cracking_history()
+
     def get_cracking_history(self, ax=None):
         '''Trace the response crack by crack.
         '''
-        z_x_lst = [np.array(self.z_x)]  # record z array of each cracking state
         # record boundary condition of each cracking state
-        BC_x_lst = [np.array(self.BC_x)]
-        sig_c_lst = [0.]  # record cracking load factor
+        self.sig_c_lst = [0.]  # record cracking load factor
+        self.eps_c_lst = [0.]
+        self.sig_m_x_lst = [np.zeros_like(self.z_x)]
+        self.z_x_lst = [self.z_x]  # record z array of each cracking state
+        BC_x_lst = [self.BC_x]
+        cc = 0
+        self.cc_lst = [cc]
 
         # the first crack initiates at the point of lowest matrix strength
         idx_0 = np.argmin(self.sig_mu_x)
+        sig_mu_0 = self.sig_mu_x[idx_0]
         self.y.append(self.x[idx_0])
-        sig_c_0 = self.sig_mu_x[idx_0] * self.cb.E_c / self.cb.E_m
-        sig_c_lst.append(sig_c_0)
-        print self.sig_mu_x[idx_0], self.x[idx_0]
-        z_x_lst.append(np.array(self.z_x))
-        BC_x_lst.append(np.array(self.BC_x))
+        sig_c_0 = sig_mu_0 * self.cb.E_c / self.cb.E_m
 
-        t1 = t.time()
-        # determine the following cracking load factors
+        # record the state at initial crack
+        self.sig_c_lst.append(sig_c_0)
+        self.eps_c_lst.append(sig_mu_0 / self.cb.E_m)
+        self.sig_m_x_lst.append(sig_mu_0 * np.ones_like(self.z_x))
+        self.z_x_lst.append(np.array(self.z_x))
+        BC_x_lst.append(np.array(self.BC_x))
+        cc += 1
+        self.cc_lst.append(cc)
+        self.tline.max = cc
+        self.tline.val = cc
+
+        # determine the following `racking load factors
         while True:
-            sig_c_i, y_i = self.get_sig_c_i(sig_c_lst[-1])
+            sig_c_i, y_i = self.get_sig_c_i(self.sig_c_lst[-1])
             if sig_c_i >= self.strength or sig_c_i == 1e6:
                 break
-#             print sig_c_i, y_i
             self.y.append(y_i)
             print 'number of cracks:', len(self.y)
             z_x_i = np.array(self.z_x)
-            sig_c_lst.append(sig_c_i)
-            z_x_lst.append(z_x_i)
             Ll_arr, Lr_arr = self.BC_x
             BC_x_lst.append(np.array(self.BC_x))
-            if self.save_cracking:
-                self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
+
             sig_m_x = self.get_sig_m_x(sig_c_i, z_x_i, Ll_arr, Lr_arr)
-            if ax:
-                ax.clf()
-                ax.plot(self.x, sig_m_x)
-                ax.show()
+            eps_c_i = self.get_eps_c_ii(sig_c_i, z_x_i, self.BC_x)
+            # record the state at the i-th crack
+            self.sig_c_lst.append(sig_c_i)
+            self.eps_c_lst.append(eps_c_i)
+            self.z_x_lst.append(z_x_i)
+            self.sig_m_x_lst.append(sig_m_x)  # stress field
+            cc += 1
+            self.cc_lst.append(cc)
+            self.tline.max = cc
+            self.tline.val = cc
 #             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
-#             print 'strength', self.strength
-        print 'cracking history determined'
         sig_c_u = self.strength
+        eps_c_u = self.get_eps_c_ii(sig_c_u, z_x_i, self.BC_x)
         print 'composite strength', sig_c_u
         n_cracks = len(self.y)
-        print [np.array(sig_c_lst)]
-        print [np.array(self.y)]
+        cc += 1
+        self.cc_lst.append(cc)
+        self.sig_c_lst.append(sig_c_u)
+        self.eps_c_lst.append(eps_c_u)
+        self.z_x_lst.append(z_x_i)
+        self.sig_m_x_lst.append(sig_m_x)  # stress field
+        self.tline.max = cc
+        self.tline.val = cc
         self.y = []
-        return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst, sig_c_u, n_cracks
+        #self.tline.val = min(sig_c_i, self.strength)
+        return (np.array(self.sig_c_lst), np.array(self.z_x_lst),
+                BC_x_lst, sig_c_u, n_cracks)
+
+    V_f = Float(1.0, label='reinforcement ratio', MAT=True,
+                auto_set=False, enter_set=True)
+
+    def _V_f_changed(self):
+        self.cb.reinforcement_lst[0].V_f = self.V_f
+
+    E_f = Float(180e3, label='fiber E modulus ', MAT=True,
+                auto_set=False, enter_set=True)
+
+    def _E_f_changed(self):
+        self.cb.reinforcement_lst[0].E_f = self.V_f
 
     #=========================================================================
     # post processing
     #=========================================================================
+
+    def get_eps_c_ii(self, sig_c, z_x, BC_x):
+        '''For each cracking level calculate the corresponding
+        composite strain eps_c.
+        '''
+        return np.trapz(self.get_eps_f_x(sig_c, z_x, BC_x[0],
+                                         BC_x[1]), self.x) / self.L
+
     def get_eps_c_i(self, sig_c_i, z_x_i, BC_x_i):
         '''For each cracking level calculate the corresponding
         composite strain eps_c.
         '''
-        return np.array([np.trapz(self.get_eps_f_x(sig_c, z_x, BC_x[0],
-                                                   BC_x[1]), self.x) / self.L
+        return np.array([self.get_eps_c_ii(self, sig_c, z_x, BC_x)
                          for sig_c, z_x, BC_x in zip(sig_c_i, z_x_i, BC_x_i)
                          ])
 
@@ -234,7 +394,7 @@ class CompositeTensileTest(HasStrictTraits):
         '''
         eps_arr = np.ones_like(load_arr)
         for i, load in enumerate(load_arr):
-            idx = np.amax([0, np.searchsorted(sig_c_i, load) - 1])
+            idx = np.searchsorted(sig_c_i, load) - 1
             z_x = z_x_i[idx]
             if np.any(z_x == 2 * self.L):
                 eps_arr[i] = load / self.cb.E_c
@@ -254,25 +414,6 @@ class CompositeTensileTest(HasStrictTraits):
 #             plt.savefig(savepath)
 
         return eps_arr
-
-#     def get_w_dist(self, sig_c_i, z_x_i, BC_x_i, load_arr):
-#         '''function for evaluate the crack width
-#         '''
-#         w_dist = []
-#         for sig_c, z_x, BC_x in zip(sig_c_i, z_x_i, BC_x_i):
-#             eps_f_x = self.get_eps_f_x(sig_c, z_x, BC_x[0], BC_x[1])
-#             eps_m_x = self.get_sig_m_x(sig_c, z_x, BC_x[0], BC_x[1]) / self.cb.E_m
-#             y = self.x[z_x == 0]
-#             if not y.size:
-#                 continue
-#             distance = np.abs(self.x[:, np.newaxis] - y[np.newaxis, :])
-#             nearest_crack = y[np.argmin(distance, axis=1)]
-#             w_arr = np.array([np.trapz( (eps_f_x[nearest_crack == y_i] - \
-#                                          eps_m_x[nearest_crack == y_i]), \
-#                                        self.x[nearest_crack == y_i] ) \
-#                                for y_i in y])
-#             w_dist.append(w_arr)
-#         return w_dist
 
     def get_w_dist(self, sig_c_i, z_x_i, BC_x_i, load_arr):
         '''function for evaluate the crack width
@@ -341,25 +482,24 @@ class CompositeTensileTest(HasStrictTraits):
 
     def save_cracking_history(self, sig_c_i, z_x_lst, BC_x_lst):
         '''save the cracking history'''
-        plt.figure(figsize = (12,4))
-#         plt.subplot(411)
+        plt.clf()
+        plt.subplot(411)
         i = len(z_x_lst)
         BC_x = BC_x_lst[i - 2]
         sig_m = self.get_sig_m_x(sig_c_i, z_x_lst[i - 2], BC_x[0], BC_x[1])
         plt.plot(self.x, sig_m)
         plt.plot(self.x, self.sig_mu_x)
-# 
-#         plt.subplot(412)
-#         plt.plot(self.x, z_x_lst[i - 2])
-# 
-#         plt.subplot(413)
-#         plt.plot(self.x, BC_x[0])
-# 
-#         plt.subplot(414)
-#         plt.plot(self.x, BC_x[1])
-        savepath = 'C:\cracking_history\\1\\BC' + str(len(self.y) - 1) + '.png'
+
+        plt.subplot(412)
+        plt.plot(self.x, z_x_lst[i - 2])
+
+        plt.subplot(413)
+        plt.plot(self.x, BC_x[0])
+
+        plt.subplot(414)
+        plt.plot(self.x, BC_x[1])
+        savepath = 'D:\cracking history\\1\\BC' + str(len(self.y) - 1) + '.png'
         plt.savefig(savepath)
-        plt.close()
 
     def get_d_m(self, sig_c_i, z_x_i, BC_x_i, load_arr):
         '''evaluate the matrix displacement'''
@@ -384,16 +524,123 @@ class CompositeTensileTest(HasStrictTraits):
 
             plt.clf()
             plt.plot(self.x, d_m)
-            savepath = 'D:\cracking history\\2\\load_step' + \
+            savepath = 'D:\cracking history\\1\\load_step' + \
                 str(i + 1) + '.png'
             plt.savefig(savepath)
 
         return d_m_arr
 
-    view = View(Item('L', show_label=False),
-                Item('n_x', show_label=False),
-                Item('cb', show_label=False),
-                buttons=['OK', 'Cancel'])
+    def paused(self):
+        self._paused = True
+
+    def stop(self):
+        self._sv_hist_reset()
+        self._restart = True
+        self.loading_scenario.reset()
+
+    _paused = tr.Bool(False)
+    _restart = tr.Bool(True)
+
+    tline = Instance(TLine)
+
+    def _tline_default(self):
+        # assign the parameters for solver and loading_scenario
+        t_max = 1.0  # self.loading_scenario.t_max
+        d_t = 0.1  # self.loading_scenario.d_t
+        return TLine(min=0.0, step=d_t, max=t_max,
+                     time_change_notifier=self.time_changed,
+                     time_range_change_notifier=self.time_range_changed
+                     )
+
+    def get_time_idx_arr(self, vot):
+        '''Get the index corresponding to visual time
+        '''
+        #x = np.array(self.sig_c_lst, dtype=np.float_)
+        x = np.array(self.cc_lst, dtype=np.float_)
+        idx = np.array(np.arange(len(x)), dtype=np.float_)
+        t_idx = np.interp(vot, x, idx)
+        return np.array(t_idx, np.int_)
+
+    def get_time_idx(self, vot):
+        return int(self.get_time_idx_arr(vot))
+
+    traits_view = View(
+        Item('L', full_size=True, resizable=True),
+        Item('V_f'),
+        Item('E_f'),
+        Item('n_x', show_label=False),
+        Item('cb', show_label=False),
+        buttons=['OK', 'Cancel']
+    )
+
+    tree_view = traits_view
+
+    def plot_sig_m(self, ax, vot,
+                   color='blue',
+                   facecolor='blue', alpha=0.2):
+
+        idx = self.get_time_idx(vot)
+        sig_m = self.sig_m_x_lst[idx]
+        ax.plot(self.x, sig_m, linewidth=2, color=color, label='sig_m')
+        ax.fill_between(self.x, 0, sig_m, color=facecolor, alpha=alpha)
+        ax.legend(loc=2)
+        ax.plot(self.x, self.sig_mu_x, color='red', label='sig_mu')
+        ax.set_ylabel('stress [MPa]')
+        ax.set_xlabel('position x [mm]')
+        ax.legend(loc=2)
+        return 0.0, np.max(self.sig_mu_x)
+
+
+def run_ctt(*args, **kw):
+
+    reinf1 = ContinuousFibers(r=3.5e-3,
+                              tau=RV(
+                                  'gamma', loc=0.00126, scale=1.440, shape=0.0539),
+                              V_f=0.01,
+                              E_f=180e3,
+                              #xi=fibers_MC(m=6.7, sV0=0.0076),
+                              xi=fibers_MC(m=8, sV0=0.0076),
+                              label='carbon',
+                              n_int=500)
+
+    cb = RandomBondCB(E_m=25e3,
+                      reinforcement_lst=[reinf1],
+                      n_BC=10,
+                      L_max=200.)
+
+    random_field = RandomField(seed=False,
+                               lacor=1.,
+                               length=500,
+                               nx=1000,
+                               nsim=1,
+                               loc=.0,
+                               shape=60.,
+                               scale=3.1,
+                               distr_type='Weibull')
+
+    ctt = CompositeTensileTest(n_x=1000,
+                               L=500,
+                               V_f=0.01,
+                               E_f=180e3,
+                               cb=cb,
+                               sig_mu_x=random_field.random_field)
+
+    print 'STRENGH', ctt.strength
+    viz2d_sig_eps = Viz2DSigEps(name='stress-strain',
+                                vis2d=ctt)
+    viz2d_state_field = Viz2DStateVarField(name='matrix stress',
+                                           vis2d=ctt)
+
+    w = BMCSWindow(model=ctt)
+
+    w.viz_sheet.viz2d_list.append(viz2d_sig_eps)
+    w.viz_sheet.viz2d_list.append(viz2d_state_field)
+    w.viz_sheet.n_cols = 1
+    w.viz_sheet.monitor_chunk_size = 1
+
+    w.run()
+    w.offline = False
+    w.configure_traits(*args, **kw)
 
 
 #=============================================================================
@@ -402,7 +649,7 @@ class CompositeTensileTest(HasStrictTraits):
 if __name__ == '__main__':
     #     plt.rc('text', usetex=True)
     #     plt.rc('font', family='serif')
-
+    run_ctt()
     home_dir = 'D:\\Eclipse\\'
     home_dir = '/home/rch'
     for i in range(5):
@@ -458,7 +705,8 @@ if __name__ == '__main__':
                                   'gamma', loc=0.00126, scale=1.440, shape=0.0539),
                               V_f=0.01,
                               E_f=180e3,
-                              xi=fibers_MC(m=6.7, sV0=0.0076),
+                              #                              xi=fibers_MC(m=6.7, sV0=0.0076),
+                              xi=fibers_MC(m=60, sV0=0.02),
                               label='carbon',
                               n_int=500)
 
