@@ -61,10 +61,16 @@ class Viz2DSigEps(Viz2D):
         ax.set_xlim(xmin=xmin, xmax=xmax)
         ax.set_ylabel('composite stress [MPa]')
         ax.set_xlabel('composite strain [-]')
+
+        E_f = self.vis2d.E_f
+        V_f = self.vis2d.V_f
+
+        sig_f = V_f * E_f * eps_t[-1]
+        ax.plot([0, eps_t[-1]], [0, sig_f], 'g-')
         # plot marker
         idx = self.vis2d.get_time_idx(vot)
         eps_idx = eps_t[idx]
-        ax.plot([eps_idx, eps_idx], [ymin, ymax], color='black')
+        ax.plot([eps_idx, eps_idx], [ymin, ymax], color='red')
         ax.legend(loc=4)
 
     def plot_tex(self, ax, vot):
@@ -314,18 +320,16 @@ class CompositeTensileTest(BMCSModel, Vis2D):
             self.tline.max = cc
             self.tline.val = cc
 #             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
-#             print 'strength', self.strength
-        print 'cracking history determined'
         sig_c_u = self.strength
         eps_c_u = self.get_eps_c_ii(sig_c_u, z_x_i, self.BC_x)
         print 'composite strength', sig_c_u
         n_cracks = len(self.y)
-        print [np.array(self.sig_c_lst)]
-        print [np.array(self.y)]
         cc += 1
         self.cc_lst.append(cc)
         self.sig_c_lst.append(sig_c_u)
         self.eps_c_lst.append(eps_c_u)
+        self.z_x_lst.append(z_x_i)
+        self.sig_m_x_lst.append(sig_m_x)  # stress field
         self.tline.max = cc
         self.tline.val = cc
         self.y = []
@@ -333,10 +337,18 @@ class CompositeTensileTest(BMCSModel, Vis2D):
         return (np.array(self.sig_c_lst), np.array(self.z_x_lst),
                 BC_x_lst, sig_c_u, n_cracks)
 
-    V_f = Property
+    V_f = Float(1.0, label='reinforcement ratio', MAT=True,
+                auto_set=False, enter_set=True)
 
-    def _get_V_f(self):
-        return self.cb
+    def _V_f_changed(self):
+        self.cb.reinforcement_lst[0].V_f = self.V_f
+
+    E_f = Float(180e3, label='fiber E modulus ', MAT=True,
+                auto_set=False, enter_set=True)
+
+    def _E_f_changed(self):
+        self.cb.reinforcement_lst[0].E_f = self.V_f
+
     #=========================================================================
     # post processing
     #=========================================================================
@@ -547,15 +559,19 @@ class CompositeTensileTest(BMCSModel, Vis2D):
         x = np.array(self.cc_lst, dtype=np.float_)
         idx = np.array(np.arange(len(x)), dtype=np.float_)
         t_idx = np.interp(vot, x, idx)
-        return np.array(t_idx + 0.5, np.int_)
+        return np.array(t_idx, np.int_)
 
     def get_time_idx(self, vot):
         return int(self.get_time_idx_arr(vot))
 
-    traits_view = View(Item('L', show_label=False),
-                       Item('n_x', show_label=False),
-                       Item('cb', show_label=False),
-                       buttons=['OK', 'Cancel'])
+    traits_view = View(
+        Item('L', full_size=True, resizable=True),
+        Item('V_f'),
+        Item('E_f'),
+        Item('n_x', show_label=False),
+        Item('cb', show_label=False),
+        buttons=['OK', 'Cancel']
+    )
 
     tree_view = traits_view
 
@@ -564,7 +580,6 @@ class CompositeTensileTest(BMCSModel, Vis2D):
                    facecolor='blue', alpha=0.2):
 
         idx = self.get_time_idx(vot)
-        print len(self.sig_m_x_lst)
         sig_m = self.sig_m_x_lst[idx]
         ax.plot(self.x, sig_m, linewidth=2, color=color, label='sig_m')
         ax.fill_between(self.x, 0, sig_m, color=facecolor, alpha=alpha)
@@ -583,7 +598,8 @@ def run_ctt(*args, **kw):
                                   'gamma', loc=0.00126, scale=1.440, shape=0.0539),
                               V_f=0.01,
                               E_f=180e3,
-                              xi=fibers_MC(m=6.7, sV0=0.0076),
+                              #xi=fibers_MC(m=6.7, sV0=0.0076),
+                              xi=fibers_MC(m=8, sV0=0.0076),
                               label='carbon',
                               n_int=500)
 
@@ -604,9 +620,12 @@ def run_ctt(*args, **kw):
 
     ctt = CompositeTensileTest(n_x=1000,
                                L=500,
+                               V_f=0.01,
+                               E_f=180e3,
                                cb=cb,
                                sig_mu_x=random_field.random_field)
 
+    print 'STRENGH', ctt.strength
     viz2d_sig_eps = Viz2DSigEps(name='stress-strain',
                                 vis2d=ctt)
     viz2d_state_field = Viz2DStateVarField(name='matrix stress',
@@ -686,7 +705,8 @@ if __name__ == '__main__':
                                   'gamma', loc=0.00126, scale=1.440, shape=0.0539),
                               V_f=0.01,
                               E_f=180e3,
-                              xi=fibers_MC(m=6.7, sV0=0.0076),
+                              #                              xi=fibers_MC(m=6.7, sV0=0.0076),
+                              xi=fibers_MC(m=60, sV0=0.02),
                               label='carbon',
                               n_int=500)
 
