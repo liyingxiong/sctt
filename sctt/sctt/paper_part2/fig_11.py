@@ -3,33 +3,34 @@ Created on 22.11.2016
 
 @author: Yingxiong
 '''
-from crack_bridge_models.random_bond_cb import RandomBondCB
+from sctt.crack_bridge_models.random_bond_cb import RandomBondCB
 import numpy as np
 from scipy.interpolate import interp1d
 import os.path
-from reinforcements.fiber_bundle import FiberBundle
+from sctt.reinforcements.fiber_bundle import FiberBundle
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
-from composite_tensile_test import CompositeTensileTest
+from sctt.composite_tensile_test import CompositeTensileTest
 import matplotlib.pyplot as plt
 from stats.misc.random_field.random_field_1D import RandomField
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
 from spirrid.rv import RV
-from calibration.matrix_strength_dependence import interp_m_shape
+from sctt.calibration.matrix_strength_dependence import interp_m_shape
 
 ax1 = plt.subplot(121)
 ax2 = plt.subplot(122)
 
 
 # plot the experimental responses
-home_dir = 'D:\\Eclipse\\'
+home_dir = 'C:\\Users\\liyin'
 for i in range(5):
     # for i in [0]:
     path1 = [home_dir, 'git',  # the path of the data file
-             'rostar',
+             '2',
              'scratch',
              'diss_figs',
+             'calib_valid',
              'TT-4C-0' + str(i + 1) + '.txt']
     filepath1 = filepath = os.path.join(*path1)
 
@@ -37,6 +38,7 @@ for i in range(5):
              'rostar',
              'scratch',
              'diss_figs',
+             'calib_valid',
              'TT-6C-0' + str(i + 1) + '.txt']
     filepath2 = os.path.join(*path2)
 
@@ -169,6 +171,7 @@ for i in range(4):
              'rostar',
              'scratch',
              'diss_figs',
+             'calib_valid',
              'TT-6C-0' + str(i + 1) + '.txt']
     filepath2 = os.path.join(*path2)
 

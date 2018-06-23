@@ -96,7 +96,6 @@ def plot_eps_sig_cs(m_fiber, vf, mean, stdev):
 
     return eps_c_arr, load_arr, eps_c_i, sig_c_i, cs
 
-11
 # the matrix strength parameters of the five speciemens - 1.0%
 # m1_arr = np.array([2.8, 2.6, 2.8, 3.4, 3.3])
 # s1_arr = np.array([0.10, 0.15, 0.15, 0.25, 0.08])

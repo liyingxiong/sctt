@@ -1,6 +1,6 @@
 from traits.api import \
     HasStrictTraits, Instance, Int, Float, List, Array, Property, \
-    cached_property
+    cached_property, Bool
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq, minimize_scalar, fmin, brute, newton
@@ -31,6 +31,8 @@ warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 class CompositeTensileTest(HasStrictTraits):
+    
+    save_cracking = Bool(False)
 
     cb = EitherType(klasses=[ConstantBondCB,
                              RandomBondCB])  # crack bridge model
@@ -62,7 +64,7 @@ class CompositeTensileTest(HasStrictTraits):
             z_grid = np.abs(self.x[:, np.newaxis] - y[np.newaxis, :])
             return np.amin(z_grid, axis=1)
         except ValueError:  # no cracks exist
-            return np.ones_like(self.x) * 2 * self.L
+            return np.ones_like(self.x) * 2. * self.L
 
     BC_x = Property(depends_on='x, y')
     '''the array containing the boundary condition for each material point
@@ -139,9 +141,9 @@ class CompositeTensileTest(HasStrictTraits):
     def get_cracking_history(self):
         '''Trace the response crack by crack.
         '''
-        z_x_lst = [self.z_x]  # record z array of each cracking state
+        z_x_lst = [np.array(self.z_x)]  # record z array of each cracking state
         # record boundary condition of each cracking state
-        BC_x_lst = [self.BC_x]
+        BC_x_lst = [np.array(self.BC_x)]
         sig_c_lst = [0.]  # record cracking load factor
 
         # the first crack initiates at the point of lowest matrix strength
@@ -165,7 +167,8 @@ class CompositeTensileTest(HasStrictTraits):
             sig_c_lst.append(sig_c_i)
             z_x_lst.append(np.array(self.z_x))
             BC_x_lst.append(np.array(self.BC_x))
-#             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
+            if self.save_cracking:
+                self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
 #             print 'strength', self.strength
         print 'cracking history determined'
         sig_c_u = self.strength
@@ -214,7 +217,7 @@ class CompositeTensileTest(HasStrictTraits):
         '''
         eps_arr = np.ones_like(load_arr)
         for i, load in enumerate(load_arr):
-            idx = np.searchsorted(sig_c_i, load) - 1
+            idx = np.amax([0, np.searchsorted(sig_c_i, load) - 1])
             z_x = z_x_i[idx]
             if np.any(z_x == 2 * self.L):
                 eps_arr[i] = load / self.cb.E_c
@@ -320,24 +323,25 @@ class CompositeTensileTest(HasStrictTraits):
 
     def save_cracking_history(self, sig_c_i, z_x_lst, BC_x_lst):
         '''save the cracking history'''
-        plt.clf()
-        plt.subplot(411)
+        plt.figure(figsize = (12,4))
+#         plt.subplot(411)
         i = len(z_x_lst)
         BC_x = BC_x_lst[i - 2]
         sig_m = self.get_sig_m_x(sig_c_i, z_x_lst[i - 2], BC_x[0], BC_x[1])
         plt.plot(self.x, sig_m)
         plt.plot(self.x, self.sig_mu_x)
-
-        plt.subplot(412)
-        plt.plot(self.x, z_x_lst[i - 2])
-
-        plt.subplot(413)
-        plt.plot(self.x, BC_x[0])
-
-        plt.subplot(414)
-        plt.plot(self.x, BC_x[1])
-        savepath = 'D:\cracking history\\1\\BC' + str(len(self.y) - 1) + '.png'
+# 
+#         plt.subplot(412)
+#         plt.plot(self.x, z_x_lst[i - 2])
+# 
+#         plt.subplot(413)
+#         plt.plot(self.x, BC_x[0])
+# 
+#         plt.subplot(414)
+#         plt.plot(self.x, BC_x[1])
+        savepath = 'C:\cracking_history\\1\\BC' + str(len(self.y) - 1) + '.png'
         plt.savefig(savepath)
+        plt.close()
 
     def get_d_m(self, sig_c_i, z_x_i, BC_x_i, load_arr):
         '''evaluate the matrix displacement'''
@@ -362,7 +366,7 @@ class CompositeTensileTest(HasStrictTraits):
 
             plt.clf()
             plt.plot(self.x, d_m)
-            savepath = 'D:\cracking history\\1\\load_step' + \
+            savepath = 'D:\cracking history\\2\\load_step' + \
                 str(i + 1) + '.png'
             plt.savefig(savepath)
 
