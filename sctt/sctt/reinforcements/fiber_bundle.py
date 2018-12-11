@@ -1,10 +1,10 @@
 from traits.api import HasTraits, Array, Instance, List, Float, Int, \
     Property, cached_property
-from util.traits.either_type import EitherType
-from types import FloatType
+
+import numpy as np
 from spirrid.rv import RV
 from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
-import numpy as np
+from util.traits.either_type import EitherType
 
 
 class FiberBundle(HasTraits):
@@ -17,7 +17,7 @@ class FiberBundle(HasTraits):
 # tau = EitherType(klasses=[FloatType, Array, RV]) # bond stiffness
     tau = Array
     tau_weights = Array  # the weights for tau, applicable when tau is an array
-    xi = EitherType(klasses=[FloatType, RV, WeibullFibers])  # breaking strain
+    xi = EitherType(klasses=[float, RV, WeibullFibers])  # breaking strain
 # r = EitherType(klasses=[FloatType, RV]) # fiber radius
     r = Float  # fiber radius
     n_int = Int(10)  # number of integration points
@@ -59,6 +59,7 @@ class FiberBundle(HasTraits):
     def _get_r_arr(self):
         return self.samples[3]
 
+
 if __name__ == '__main__':
 
     reinf = FiberBundle(r=0.0035,
@@ -69,4 +70,4 @@ if __name__ == '__main__':
                         V_f=0.1,
                         E_f=200e3,
                         xi=0.035)
-    print reinf.depsf_arr
+    print((reinf.depsf_arr))

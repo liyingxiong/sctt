@@ -39,7 +39,7 @@ ax.set_ylabel('stress [MPa]')
 plt.subplots_adjust(left=0.32, right=0.99)
 
 check = CheckButtons(
-    label_position, sorted(d_set.keys()), np.zeros(len(d_set.keys())))
+    label_position, sorted(d_set.keys()), np.zeros(len(list(d_set.keys()))))
 
 
 def func(label):

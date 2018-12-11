@@ -224,9 +224,9 @@ for i in range(5):
     plt.step(
         np.hstack((0, a / 2, strength_e[i])), np.hstack((120, cs, cs[-1])), color='0.5')
 
-print nc_lst
-print np.mean(nc_lst)
-print 240. / np.mean(nc_lst)
+print(nc_lst)
+print((np.mean(nc_lst)))
+print((240. / np.mean(nc_lst)))
 
 plt.ylim(0, 140)
 # plt.xlabel('sig_c [Mpa')

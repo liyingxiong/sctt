@@ -117,7 +117,7 @@ if __name__ == '__main__':
     
     a = brute(get_lack_of_fit, ((0.15, 0.25), (0.005, 0.007), (0.7, 0.9)), Ns=10, finish=None)
     
-    print a
+    print(a)
         
         
         

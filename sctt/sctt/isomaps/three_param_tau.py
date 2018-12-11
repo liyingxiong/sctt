@@ -48,7 +48,7 @@ def plot_m_s(s_tau, m_tau, l_tau, w_arr, sig_w):
     delta = np.zeros((n, n))
 
     for i in range(n):
-        print i
+        print(i)
         for j in range(n):
             delta[i, j] = lackoffit(
                 X[i, j], Y[i, j], l_tau, w_arr, sig_w)
@@ -114,7 +114,7 @@ def plot_m_l(s_tau, m_tau, l_tau, w_arr, sig_w):
     delta = np.zeros((n, n))
 
     for i in range(n):
-        print i
+        print(i)
         for j in range(n):
             delta[i, j] = lackoffit(
                 X[i, j], s_tau, Y[i, j], w_arr, sig_w)
@@ -183,7 +183,7 @@ def plot_s_l(s_tau, m_tau, l_tau, w_arr, sig_w):
 
     for i in range(n):
         for j in range(n):
-            print j
+            print(j)
             delta[i, j] = lackoffit(
                 m_tau, X[i, j], Y[i, j], w_arr, sig_w)
 

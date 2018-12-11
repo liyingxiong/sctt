@@ -73,8 +73,8 @@ for i, s_m in enumerate([2.82, 2.65, 2.85, 3.42, 3.30]):
     path = 'D:\\1.0_' + str(i + 1) + '.pdf'
     plt.ylim((0, 25))
     plt.savefig(path, format='pdf')
-    print sig_c_u
-    print [sig_c_i]
+    print(sig_c_u)
+    print([sig_c_i])
 
 
 reinf1 = ContinuousFibers(r=3.5e-3,
@@ -126,8 +126,8 @@ for i, s_m in enumerate([4.70547783,  3.97960818,  4.36307537,  3.99053079,  4.1
     path = 'D:\\1.5_' + str(i + 1) + '.pdf'
     plt.ylim((0, 25))
     plt.savefig(path, format='pdf')
-    print sig_c_u
-    print [sig_c_i]
+    print(sig_c_u)
+    print([sig_c_i])
 
 
 plt.show()

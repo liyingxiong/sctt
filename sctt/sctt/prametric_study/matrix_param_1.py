@@ -76,7 +76,7 @@ def cal(k):
     for i in range(10):
         m_m = bisect(lambda m: scale(m) - s_m_arr[i], 1., 1000.)
 
-        print m_m
+        print(m_m)
 
         random_field = RandomField(seed=False,
                                    lacor=1.,
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     from joblib import Parallel, delayed
     import multiprocessing
 
-    inputs = range(5)
+    inputs = list(range(5))
     num_cores = multiprocessing.cpu_count()
 
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 #     lack_of_fit, crack_spacing = cal(5)
     results = Parallel(n_jobs=num_cores)(delayed(cal)(5) for i in inputs)
 
-    print results
+    print(results)
 
 
 #     fig, ax1 = plt.subplots()

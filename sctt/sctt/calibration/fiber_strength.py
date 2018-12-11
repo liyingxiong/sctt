@@ -17,7 +17,7 @@ def bundle_strength(m, sV0, L):
     E = 181e3
     return E * sV0 * (m * L * pi * r ** 2) ** (-1 / m) * np.exp(-1 / m)
 
-print strength(8.806, 0.0134, 100)
+print((strength(8.806, 0.0134, 100)))
 
 # s = []
 # m_arr = np.array([6.0, 7.0, 8.0, 9.0, 10.0, 11.0])

@@ -7,31 +7,34 @@ from scipy.interpolate import interp1d
 from scipy.optimize import brentq, minimize_scalar, fmin, brute, newton
 from scipy.stats import gamma as gam
 from traits.api import \
-    HasStrictTraits, Instance, Int, Float, List, Array, Property, \
+    Instance, Int, Float, List, Array, Property, \
     cached_property
 from traitsui.api import \
     View, Item, Group
-from util.traits.either_type import EitherType
-from view.plot2d import Viz2D, Vis2D
-from view.ui import BMCSLeafNode
-from view.window import BMCSModel, BMCSWindow, TLine
 
-from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.random_bond_cb import RandomBondCB
-from crack_bridge_models.representative_cb import RepresentativeCB
 import numpy as np
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.hom_CB_elastic_mtrx \
     import CompositeCrackBridge
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
-from random_fields.simple_random_field import SimpleRandomField
-from reinforcements.fiber_bundle import FiberBundle
 from spirrid.rv import RV
 from stats.misc.random_field.random_field_1D import RandomField
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
 import time as t
 import traits.api as tr
+from util.traits.either_type import EitherType
+from view.plot2d import Viz2D, Vis2D
+from view.ui import BMCSLeafNode
+from view.window import BMCSModel, BMCSWindow, TLine
+
+from .crack_bridge_models.bmcs_random_bond_cb import \
+    BMCSRandomBondCB, Viz2DCBFieldVar
+from .crack_bridge_models.constant_bond_cb import ConstantBondCB
+from .crack_bridge_models.random_bond_cb import RandomBondCB
+from .crack_bridge_models.representative_cb import RepresentativeCB
+from .random_fields.simple_random_field import SimpleRandomField
+from .reinforcements.fiber_bundle import FiberBundle
 
 
 # from calibration import Calibration
@@ -125,17 +128,22 @@ class Viz2DStateVarField(Viz2D):
 
 class CompositeTensileTest(BMCSModel, Vis2D):
 
-    node_name = 'composite tensile test'
+    node_name = 'Composite tensile test'
 
     tree_node_list = List([])
 
     def _tree_node_list_default(self):
-
         return [
+            self.cb
+        ]
+
+    def _update_node_list(self):
+        self.tree_node_list = [
+            self.cb
         ]
 
     cb = EitherType(klasses=[ConstantBondCB,
-                             RandomBondCB])  # crack bridge model
+                             BMCSRandomBondCB])  # crack bridge model
 
     #=========================================================================
     # Discretization of the specimen
@@ -188,15 +196,15 @@ class CompositeTensileTest(BMCSModel, Vis2D):
     #=========================================================================
     experimental_strength = Float(20.)
     strength = Property(depends_on='n_x, L, y, cb')
-    '''the strength of the specimen is defined as the minimum of the strength of 
-    all crack bridges'''
+    '''the strength of the specimen is defined as the minimum 
+    of the strength of all crack bridges'''
     @cached_property
     def _get_strength(self):
-        if len(self.y) == 0:
+        if len(self.y) == 0:  # no crack, return high value
             return 1e2
         else:
             y = np.sort(self.y)
-            d = (y[1:] - y[:-1]) / 2.0
+            d = (y[1:] - y[:-1]) / 2.0  # half distance between cracks
             L_left = np.hstack([y[0], d])
             L_right = np.hstack([d, self.L - y[-1]])
             v = np.vectorize(self.cb.get_index)
@@ -303,7 +311,7 @@ class CompositeTensileTest(BMCSModel, Vis2D):
             if sig_c_i >= self.strength or sig_c_i == 1e6:
                 break
             self.y.append(y_i)
-            print 'number of cracks:', len(self.y)
+            print(('number of cracks:', len(self.y)))
             z_x_i = np.array(self.z_x)
             Ll_arr, Lr_arr = self.BC_x
             BC_x_lst.append(np.array(self.BC_x))
@@ -322,7 +330,7 @@ class CompositeTensileTest(BMCSModel, Vis2D):
 #             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
         sig_c_u = self.strength
         eps_c_u = self.get_eps_c_ii(sig_c_u, z_x_i, self.BC_x)
-        print 'composite strength', sig_c_u
+        print(('composite strength', sig_c_u))
         n_cracks = len(self.y)
         cc += 1
         self.cc_lst.append(cc)
@@ -398,20 +406,13 @@ class CompositeTensileTest(BMCSModel, Vis2D):
             z_x = z_x_i[idx]
             if np.any(z_x == 2 * self.L):
                 eps_arr[i] = load / self.cb.E_c
-                sig_m = self.cb.E_m * eps_arr[i] * np.ones_like(self.x)
             else:
                 BC_x = BC_x_i[idx]
-                eps_arr[i] = np.trapz(self.get_eps_f_x(load, z_x, BC_x[0],
-                                                       BC_x[1]), self.x) / self.L
-                sig_m = self.get_sig_m_x(load, z_x, BC_x[0], BC_x[1])
-            # save the cracking history
-#             plt.clf()
-#             plt.plot(self.x, sig_m)
-#             plt.plot(self.x, self.sig_mu_x)
-#             plt.ylim((0., 1.2 * np.max(self.sig_mu_x)))
-#             savepath = 'D:\cracking history\\1\\load_step' + \
-#                 str(i + 1) + '.png'
-#             plt.savefig(savepath)
+                eps_arr[i] = np.trapz(
+                    self.get_eps_f_x(load, z_x, BC_x[0],
+                                     BC_x[1]
+                                     ), self.x
+                ) / self.L
 
         return eps_arr
 
@@ -566,9 +567,9 @@ class CompositeTensileTest(BMCSModel, Vis2D):
 
     traits_view = View(
         Item('L', full_size=True, resizable=True),
-        Item('V_f'),
-        Item('E_f'),
-        Item('n_x', show_label=False),
+        Item('V_f', ),
+        Item('E_f', ),
+        Item('n_x', show_label=True),
         Item('cb', show_label=False),
         buttons=['OK', 'Cancel']
     )
@@ -595,18 +596,20 @@ def run_ctt(*args, **kw):
 
     reinf1 = ContinuousFibers(r=3.5e-3,
                               tau=RV(
-                                  'gamma', loc=0.00126, scale=1.440, shape=0.0539),
+                                  'gamma', loc=0.0126, scale=1.440, shape=0.0539),
                               V_f=0.01,
                               E_f=180e3,
                               #xi=fibers_MC(m=6.7, sV0=0.0076),
-                              xi=fibers_MC(m=8, sV0=0.0076),
+                              xi=fibers_MC(m=30, sV0=0.02),
                               label='carbon',
                               n_int=500)
 
-    cb = RandomBondCB(E_m=25e3,
-                      reinforcement_lst=[reinf1],
-                      n_BC=10,
-                      L_max=200.)
+    cb = BMCSRandomBondCB(E_m=25e3,
+                          reinforcement_lst=[reinf1],
+                          n_BC=10,
+                          L_max=200.)
+
+    #cb = ConstantBondCB()
 
     random_field = RandomField(seed=False,
                                lacor=1.,
@@ -625,20 +628,24 @@ def run_ctt(*args, **kw):
                                cb=cb,
                                sig_mu_x=random_field.random_field)
 
-    print 'STRENGH', ctt.strength
+    print(('STRENGH', ctt.strength))
+    print((ctt.BC_x))
     viz2d_sig_eps = Viz2DSigEps(name='stress-strain',
                                 vis2d=ctt)
     viz2d_state_field = Viz2DStateVarField(name='matrix stress',
                                            vis2d=ctt)
+    viz2d_cb_field = Viz2DCBFieldVar(name='crack bridge field',
+                                     vis2d=cb, visible=False)
 
     w = BMCSWindow(model=ctt)
 
     w.viz_sheet.viz2d_list.append(viz2d_sig_eps)
     w.viz_sheet.viz2d_list.append(viz2d_state_field)
+    w.viz_sheet.viz2d_list.append(viz2d_cb_field)
     w.viz_sheet.n_cols = 1
     w.viz_sheet.monitor_chunk_size = 1
 
-    w.run()
+    # w.run()
     w.offline = False
     w.configure_traits(*args, **kw)
 
@@ -730,21 +737,24 @@ if __name__ == '__main__':
                                cb=cb,
                                sig_mu_x=random_field.random_field)
 
-    print '---------------'
-    print ctt.BC_x
-    print '----------------'
-    sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history(plt)
-#     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
-    print '1.5%', [sig_c_i]
-    print np.sort(ctt.y)
+    print('---------------')
+    print((ctt.BC_x))
+    print('----------------')
+    if False:
+        sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history(
+            plt)
+    #     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
+        print(('1.5%', [sig_c_i]))
+        print((np.sort(ctt.y)))
 
-    load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
-    eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
-#     damage_arr = ctt.get_damage_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
-    crack_eps = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, sig_c_i)
+        load_arr = np.unique(
+            np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
+        eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
+    #     damage_arr = ctt.get_damage_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
+        crack_eps = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, sig_c_i)
 
-    plt.plot(eps_c_arr, load_arr, 'k', lw=2, label='v_f=1.5%')
-#     plt.plot(crack_eps, sig_c_i, 'ko')
+        plt.plot(eps_c_arr, load_arr, 'k', lw=2, label='v_f=1.5%')
+    #     plt.plot(crack_eps, sig_c_i, 'ko')
 
 
 #     for i, load in enumerate(load_arr):

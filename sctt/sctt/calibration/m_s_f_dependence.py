@@ -120,9 +120,9 @@ for m_f in np.linspace(6.5, 10.5, 10):
         fcn2min, params, method='Nelder-Mead', args=(w_arr, sig_w))
 
     # print sV0
-    print result.chisqr
+    print((result.chisqr))
     lack.append(result.chisqr)
-    print params
+    print(params)
     s_f_arr.append(params['f_scale'].value)
 
     # calculate final result
@@ -137,6 +137,6 @@ plt.legend(loc='best', ncol=2)
 # plt.plot(w_arr1, sig_w1, 'k--', lw=2, label='experimental')
 # sig1 = fcn2min(params, w_arr1, sig_w1) + sig_w1
 # plt.plot(w_arr1, sig1, 'k', lw=2, label='model')
-print lack
-print s_f_arr
+print(lack)
+print(s_f_arr)
 plt.show()

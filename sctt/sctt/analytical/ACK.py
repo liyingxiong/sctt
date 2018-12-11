@@ -83,8 +83,8 @@ sig_c_K, eps_c_K = get_cracking_history()
 plt.plot(eps_c_K, sig_c_K)
 # plt.plot([0.0, sig_cu / (Ef * vf)], [0.0, sig_cu])
 
-print 5000. / len(sig_c_K)
-print 1.337 * delta_ack
+print((5000. / len(sig_c_K)))
+print((1.337 * delta_ack))
 
 
 def ACK(sig_mu):

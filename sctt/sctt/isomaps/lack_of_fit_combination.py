@@ -106,19 +106,19 @@ params.add('f_scale', value=0.007, min=0)
 result = minimize(
     fcn2min, params, method='Nelder-Mead', args=(w_arr, sig_w))
 
-print params
+print(params)
 
 m_f = params['f_shape'].value
 s_f = params['f_scale'].value
 m_tau = params['shape'].value
 s_tau = params['scale'].value
 
-from lack_of_fit_f import plot_f
-from lack_of_fit_m_f_s_tau import plot_m_f_s_tau
-from lack_of_fit_s_f_m_tau import plot_s_f_m_tau
-from lack_of_fit_scale import plot_scale
-from lack_of_fit_shape import plot_shape
-from lack_of_fit_tau import plot_tau
+from .lack_of_fit_f import plot_f
+from .lack_of_fit_m_f_s_tau import plot_m_f_s_tau
+from .lack_of_fit_s_f_m_tau import plot_s_f_m_tau
+from .lack_of_fit_scale import plot_scale
+from .lack_of_fit_shape import plot_shape
+from .lack_of_fit_tau import plot_tau
 
 plot_f(m_f, s_f, m_tau, s_tau, w_arr, sig_w)
 plot_m_f_s_tau(m_f, s_f, m_tau, s_tau, w_arr, sig_w)

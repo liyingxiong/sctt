@@ -29,7 +29,7 @@ filename = 'D:\\data\\Tensile_test_multiple_cracking\\acl=20_12x12\\lof_avg.txt'
 a = np.loadtxt(filename)
 lof = np.reshape(a, (12, 12), order='C')
 
-print lof
+print(lof)
 
 s_m_arr = np.linspace(2.5, 4.5, 12)
 m_m_arr = np.linspace(5, 35, 12)

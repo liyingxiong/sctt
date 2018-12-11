@@ -51,7 +51,7 @@ ctt.sig_mu_x = random_field.random_field
 
 sig_c_i, z_x_i, BC_x_i, sig_c_u, n_cracks = ctt.get_cracking_history()
 load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
-print load_arr
+print(load_arr)
 eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)
 eps_c_i = np.interp(np.hstack((sig_c_i, sig_c_u)), load_arr, eps_c_arr)
 cs = 500. / (np.arange(len(z_x_i)) + 1)

@@ -27,7 +27,7 @@ x = np.linspace(0, 75, 1500)  # specimen discretization
 
 delta_ack = vm * sig_mu / (2. * vf * tau_r)
 
-print delta_ack
+print(delta_ack)
 
 cs = []
 m_arr = np.array([2., 4., 6., 10., 14., 3000.])
@@ -105,8 +105,8 @@ for m in m_arr:
 plt.legend()
 
 fig, ax = plt.subplots()
-print cs
-print np.array(cs) / delta_ack
+print(cs)
+print((np.array(cs) / delta_ack))
 m_arr[-1] = 20
 ax.plot(m_arr, np.array(cs) / delta_ack)
 ax.set_xticks([i for i in m_arr])

@@ -80,7 +80,7 @@ def plot_s_f_m_tau(m_f, s_f, m_tau, s_tau, w_arr, sig_w):
 
     for i in range(n):
         for j in range(n):
-            print j
+            print(j)
             delta[i, j] = lackoffit(
                 m_f, X[i, j], Y[i, j], s_tau, w_arr, sig_w)
 

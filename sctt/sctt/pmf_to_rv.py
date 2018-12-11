@@ -2,7 +2,7 @@ from etsproxy.traits.api import Float, Property, cached_property, Int, \
      Instance, Array, HasTraits
 import numpy as np
 from scipy.interpolate import interp1d
-from calibration import Calibration
+from .calibration import Calibration
 from matplotlib import pyplot as plt
 from scipy.optimize import brute, nnls
 
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     pdf = pr.pdf(x_array)
     
     plt.plot(x_array, pdf)
-    print np.trapz(pdf, x_array)
+    print((np.trapz(pdf, x_array)))
     plt.show()
     
 

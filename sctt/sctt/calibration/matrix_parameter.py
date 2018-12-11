@@ -18,8 +18,8 @@ for m_m in np.linspace(30., 500., 200):
             return sig_min / (f * gamma(1 + 1 / shape))
         s.append(scale(m_m))
     s_m.append(np.mean(s))
-print s_m
-print np.mean([2.727, 3.102, 2.927, 3.439])
+print(s_m)
+print((np.mean([2.727, 3.102, 2.927, 3.439])))
 # print np.mean(s)
 # print scale(35.)
 # print scale(45.)

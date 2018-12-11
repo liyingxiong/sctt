@@ -97,8 +97,8 @@ for m, s in zip(mean_arr, stdev_arr):
     eps_c_i = np.interp(np.hstack((sig_c_i, sig_c_u)), load_arr, eps_c_arr)
     ax2.plot(eps_c_i, cs, drawstyle='steps', lw=2)
 
-    print 'sig_c_i', sig_c_i
-    print 'cs', cs[-1]
+    print(('sig_c_i', sig_c_i))
+    print(('cs', cs[-1]))
 
 # =========================================================================
 # 1% aramis

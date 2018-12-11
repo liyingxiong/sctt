@@ -119,9 +119,9 @@ result = minimize(
 
 # print sV0
 # print 'w_max', w_max
-print 'lack of fit', result.chisqr
-print 'normalized', result.chisqr / np.sum(sig_w ** 2)
-print params
+print(('lack of fit', result.chisqr))
+print(('normalized', result.chisqr / np.sum(sig_w ** 2)))
+print(params)
 
 # calculate final result
 #     final = sig_w + result.residual

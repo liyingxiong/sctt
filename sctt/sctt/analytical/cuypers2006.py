@@ -184,11 +184,11 @@ plt.plot(eps_c_K, sig_c_K, label='pmcm')
 plt.legend()
 
 
-print np.amax(x)
-print len(sig_c_K)
+print((np.amax(x)))
+print((len(sig_c_K)))
 cs = np.amax(x) / len(sig_c_K)
-print cs / delta_ack
-print cs
+print((cs / delta_ack))
+print(cs)
 
 plt.figure()
 for i in np.arange(7):

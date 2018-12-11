@@ -105,8 +105,8 @@ result = minimize(
 
 # print sV0
 # print 'w_max', w_max
-print 'lack of fit', result.chisqr
-print params
+print(('lack of fit', result.chisqr))
+print(params)
 
 # calculate final result
 final = sig_w + result.residual

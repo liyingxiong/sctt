@@ -12,7 +12,7 @@ from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
 import matplotlib.pyplot as plt
 from scipy.optimize import fmin, fmin_powell, fmin_slsqp
-from calibration import Calibration
+from .calibration import Calibration
 
 
 tau_arr=np.logspace(np.log10(1e-5), 0.5, 100)
@@ -60,10 +60,10 @@ def calibration_cb(tau_weights):
                    L_max = 100)
     ccb.max_sig_c(ccb.Ll, ccb.Lr)
     ccb.damage
-    print ccb.E_m*ccb._epsm_arr[-1]
+    print((ccb.E_m*ccb._epsm_arr[-1]))
     residual = np.sum(np.abs(exp_data-sig_avg)) + \
                 100000*np.abs(ccb.E_m*ccb._epsm_arr[-1]-3.5)
-    print residual
+    print(residual)
     return residual
 
 
@@ -91,7 +91,7 @@ ccb1 = RandomBondCB(E_m=25e3,
                    Ll=6.85,
                    Lr=6.85,
                    L_max = 100)
-print ccb1.max_sig_c(ccb1.Ll, ccb1.Lr)
+print((ccb1.max_sig_c(ccb1.Ll, ccb1.Lr)))
 plt.figure()
 plt.plot(ccb1._x_arr, ccb1.E_m*ccb1._epsm_arr)
 
@@ -99,7 +99,7 @@ plt.figure()
 plt.plot(np.zeros_like(ccb1._epsf0_arr), ccb1._epsf0_arr, 'ro', label='maximum')
 for i, depsf in enumerate(ccb1.sorted_depsf):
     epsf_x = np.maximum(ccb1._epsf0_arr[i] - depsf * np.abs(ccb1._x_arr), ccb1._epsm_arr)
-    print np.trapz(epsf_x - ccb1._epsm_arr, ccb1._x_arr)
+    print((np.trapz(epsf_x - ccb1._epsm_arr, ccb1._x_arr)))
     if i == 0:
         plt.plot(ccb1._x_arr, epsf_x, color='blue', label='fibers')
     else:

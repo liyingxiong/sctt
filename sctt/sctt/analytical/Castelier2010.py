@@ -100,7 +100,7 @@ def curtin(sig_c, L_0, l_slice):
     m = 5.
 #     sig_rc = (L_0 / l_slice) ** (1. / m) * sig_0
     sig_rc = sig_0
-    print sig_rc
+    print(sig_rc)
 
     def delta(sig_c):  # Eq.(9)
         return vm * Em * sig_c / (2. * Ec * vf * tau_r)
@@ -147,8 +147,8 @@ for m in m_arr:
     plt.plot(eps_c_K, sig_c_K, 'k--', label='PMCM')
     n_cracks.append(len(sig_c_K))
 
-print n_cracks
-print L_c / (np.array(n_cracks))
+print(n_cracks)
+print((L_c / (np.array(n_cracks))))
 
 # compute the analytical results
 sig_c_arr = np.linspace(0, 6, 200)

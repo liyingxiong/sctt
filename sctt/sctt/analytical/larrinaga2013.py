@@ -48,7 +48,7 @@ cs_tb2 = 210. * 7. / n_tb2
 cs_tb3 = 210. * 7. / n_tb3
 cs_tb4 = 210. * 7. / n_tb4
 
-print cs_tb2, cs_tb3, cs_tb4
+print((cs_tb2, cs_tb3, cs_tb4))
 
 # PMCM-ACK
 for vf in [0.007, 0.0105, 0.014]:

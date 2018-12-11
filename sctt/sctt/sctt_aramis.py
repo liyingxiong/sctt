@@ -9,9 +9,9 @@ from etsproxy.traits.api import \
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq, minimize_scalar, fmin, brute, newton
-from random_fields.simple_random_field import SimpleRandomField
-from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.representative_cb import RepresentativeCB
+from .random_fields.simple_random_field import SimpleRandomField
+from .crack_bridge_models.constant_bond_cb import ConstantBondCB
+from .crack_bridge_models.representative_cb import RepresentativeCB
 from util.traits.either_type import EitherType
 from etsproxy.traits.ui.api import \
     View, Item, Group
@@ -24,8 +24,8 @@ from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
 from spirrid.rv import RV
 from stats.misc.random_field.random_field_1D import RandomField
 from matplotlib import pyplot as plt
-from crack_bridge_models.random_bond_cb import RandomBondCB
-from reinforcements.fiber_bundle import FiberBundle
+from .crack_bridge_models.random_bond_cb import RandomBondCB
+from .reinforcements.fiber_bundle import FiberBundle
 import os.path
 from scipy.stats import gamma as gam
 
@@ -174,7 +174,7 @@ class CTTAramis(HasStrictTraits):
 
 if __name__ == '__main__':
 
-    from calibration.tau_strength_dependence import interp_tau_shape, interp_tau_scale
+    from .calibration.tau_strength_dependence import interp_tau_shape, interp_tau_scale
 
     homedir = 'D:\\data\\'
     path = [homedir, 'test61.txt']

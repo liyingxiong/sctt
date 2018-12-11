@@ -87,8 +87,8 @@ for i in range(n):
         lack_of_fit[i, j] = np.sum((sig_sim - sig_exp) ** 2)
         crack_spacing[i, j] = ctt.L / n_cracks
 
-print [lack_of_fit]
-print [crack_spacing]
+print([lack_of_fit])
+print([crack_spacing])
 
 plt.figure(figsize=(12, 9))
 im = plt.imshow(lack_of_fit, interpolation='bilinear', origin='lower',

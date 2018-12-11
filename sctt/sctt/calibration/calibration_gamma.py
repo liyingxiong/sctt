@@ -16,7 +16,7 @@ from quaducom.micro.resp_func.CB_clamped_rand_xi import CBClampedRandXi
 from spirrid.spirrid import SPIRRID
 from spirrid.rv import RV
 from math import pi
-from tau_strength_dependence import interp_tau_shape, interp_tau_scale
+from .tau_strength_dependence import interp_tau_shape, interp_tau_scale
 
 
 plt.rc('text', usetex=True)
@@ -103,7 +103,7 @@ for sV0 in [0.0080, 0.0085, 0.0090, 0.0095]:
         plt.plot(
             w_arr, sigma, label='$m_\mathrm{f}=7, s_\mathrm{f}=$' + str(sV0) + ', $s_{tau}=$' + str(round(scale, 2)))
 
-print residual
+print(residual)
 
 plt.plot(w_arr, sig_w, 'k--', lw=2, label='experiment')
 plt.legend(loc='best', ncol=3)

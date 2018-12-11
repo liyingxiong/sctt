@@ -74,7 +74,7 @@ cali = Calibration(experi_data=exp_data,
     
 damage = cali.get_damage_portion(cali.sV0, 8.5e-2)
  
-print np.sum(2*cali.tau_arr/cali.r*cali.tau_weights)
+print((np.sum(2*cali.tau_arr/cali.r*cali.tau_weights)))
 # # 
 # print cali.sig_mu*(1-cali.V_f)/(cali.bc*cali.V_f)
 
@@ -171,7 +171,7 @@ plt.subplot(223)
 plt.plot(cali.w_arr, sigma)
 plt.subplot(224)
 x = cali.tau_weights
-print np.sum(x)
+print((np.sum(x)))
 for i, sigmai in enumerate(sigma.T):
     plt.plot(cali.w_arr, sigmai, color='0', lw='1.5', alpha=x[i] / np.max(x))
       

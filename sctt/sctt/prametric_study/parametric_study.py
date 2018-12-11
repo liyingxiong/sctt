@@ -68,9 +68,9 @@ for i, m in enumerate([6.0, 7.0, 8.0, 9.0, 10.0, 11.0]):
                                    cb=cb,
                                    sig_mu_x=random_field.random_field)
         sig_c_i, z_x_i, BC_x_i, sig_c_u = ctt.get_cracking_history()
-        print sig_c_i
-        print m, s
-        print 'number of cracks:', len(ctt.y)
+        print(sig_c_i)
+        print((m, s))
+        print(('number of cracks:', len(ctt.y)))
         n_cracks.append(len(ctt.y))
 
-print n_cracks
+print(n_cracks)

@@ -47,7 +47,7 @@ for i in range(5):
         y = np.interp(x, -data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
                       data[:, 1] / 2.)
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
-        print '1%', slope
+        print(('1%', slope))
         vf1.append(slope)
         plt.plot(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
                  data[:, 1] / 2.)
@@ -58,14 +58,14 @@ for i in range(5):
         y = np.interp(x, -data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
                       data[:, 1] / 2.)
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
-        print '1.5%', slope / 1.5
+        print(('1.5%', slope / 1.5))
         vf15.append(slope)
         plt.plot(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.,
                  data[:, 1] / 2.)
 
 
-print np.array(vf1), np.mean(vf1)
-print np.array(vf15) / 1.5, np.mean(vf15) / 1.5
+print((np.array(vf1), np.mean(vf1)))
+print((np.array(vf15) / 1.5, np.mean(vf15) / 1.5))
 plt.plot([0., 0.007], [0., 0.007 * 1800], 'k--', lw=1)
 plt.plot([0., 0.007], [0., 0.007 * 1800 * 1.5], 'k--', lw=1)
 

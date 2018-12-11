@@ -40,7 +40,7 @@ fpath = 'D:\\data\\Tensile_test_multiple_cracking\\ss_curve_mm_24_1\\'
 
 for s_m in s_m_arr:
 
-    print s_m
+    print(s_m)
 
     random_field = RandomField(seed=False,
                                lacor=1.,

@@ -85,7 +85,7 @@ def calculate(eps_arr, sig_lst, sig_avg, k):
 
 if __name__ == '__main__':
 
-    inputs = range(1600)
+    inputs = list(range(1600))
     #num_cores = multiprocessing.cpu_count()
     num_cores = 160
 
@@ -97,7 +97,7 @@ if __name__ == '__main__':
             np.amax(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.))
     eps_max = np.amin(eps_max_lst)
 
-    print eps_max
+    print(eps_max)
 
 #     eps_max = 0.00575
 
@@ -111,7 +111,7 @@ if __name__ == '__main__':
         eps = -data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.
         sig = data[:, 1] / 2.
         if j == 1:
-            print np.amax(eps[0:1500])
+            print((np.amax(eps[0:1500])))
             interp_exp = interp1d(eps[0:1500],
                                   sig[0:1500], bounds_error=False, fill_value=0.)
         else:
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     crack_spacing = np.zeros(1600)
 
     for i in range(5):
-        print i
+        print(i)
     #import time as t
     #t1 = t.time()
         results = Parallel(n_jobs=num_cores)(
@@ -196,5 +196,5 @@ if __name__ == '__main__':
 #     text_file.write(s)
 #     text_file.close()
 
-    print results
+    print(results)
     #print [np.sum(results, axis=0) / 6]

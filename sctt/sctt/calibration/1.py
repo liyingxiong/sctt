@@ -73,5 +73,5 @@ sig_sim = interp_sim(eps_arr)
 lack_of_fit = np.sum((sig_sim - sig_exp) ** 2)
 crack_spacing = ctt.L / n_cracks
 
-print lack_of_fit
-print crack_spacing
+print(lack_of_fit)
+print(crack_spacing)

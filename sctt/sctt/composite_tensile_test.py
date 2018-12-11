@@ -12,24 +12,24 @@ from traits.api import \
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq, minimize_scalar, fmin, brute, newton
-from random_fields.simple_random_field import SimpleRandomField
-from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.representative_cb import RepresentativeCB
+from .random_fields.simple_random_field import SimpleRandomField
+from .crack_bridge_models.constant_bond_cb import ConstantBondCB
+from .crack_bridge_models.representative_cb import RepresentativeCB
 from util.traits.either_type import EitherType
 from traitsui.api import \
     View, Item, Group
 from util.traits.either_type import EitherType
 
-from crack_bridge_models.constant_bond_cb import ConstantBondCB
-from crack_bridge_models.random_bond_cb import RandomBondCB
-from crack_bridge_models.representative_cb import RepresentativeCB
+from .crack_bridge_models.constant_bond_cb import ConstantBondCB
+from .crack_bridge_models.random_bond_cb import RandomBondCB
+from .crack_bridge_models.representative_cb import RepresentativeCB
 import numpy as np
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.hom_CB_elastic_mtrx \
     import CompositeCrackBridge
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
-from random_fields.simple_random_field import SimpleRandomField
-from reinforcements.fiber_bundle import FiberBundle
+from .random_fields.simple_random_field import SimpleRandomField
+from .reinforcements.fiber_bundle import FiberBundle
 from spirrid.rv import RV
 from stats.misc.random_field.random_field_1D import RandomField
 from stats.pdistrib.weibull_fibers_composite_distr import \
@@ -160,7 +160,7 @@ class CompositeTensileTest(HasStrictTraits):
         self.y.append(self.x[idx_0])
         sig_c_0 = self.sig_mu_x[idx_0] * self.cb.E_c / self.cb.E_m
         sig_c_lst.append(sig_c_0)
-        print self.sig_mu_x[idx_0], self.x[idx_0]
+        print((self.sig_mu_x[idx_0], self.x[idx_0]))
         z_x_lst.append(np.array(self.z_x))
         BC_x_lst.append(np.array(self.BC_x))
 
@@ -172,7 +172,7 @@ class CompositeTensileTest(HasStrictTraits):
                 break
 #             print sig_c_i, y_i
             self.y.append(y_i)
-            print 'number of cracks:', len(self.y)
+            print(('number of cracks:', len(self.y)))
             z_x_i = np.array(self.z_x)
             sig_c_lst.append(sig_c_i)
             z_x_lst.append(z_x_i)
@@ -187,12 +187,12 @@ class CompositeTensileTest(HasStrictTraits):
                 ax.show()
 #             self.save_cracking_history(sig_c_i, z_x_lst, BC_x_lst)
 #             print 'strength', self.strength
-        print 'cracking history determined'
+        print('cracking history determined')
         sig_c_u = self.strength
-        print 'composite strength', sig_c_u
+        print(('composite strength', sig_c_u))
         n_cracks = len(self.y)
-        print [np.array(sig_c_lst)]
-        print [np.array(self.y)]
+        print([np.array(sig_c_lst)])
+        print([np.array(self.y)])
         self.y = []
         return np.array(sig_c_lst), np.array(z_x_lst), BC_x_lst, sig_c_u, n_cracks
 
@@ -482,13 +482,13 @@ if __name__ == '__main__':
                                cb=cb,
                                sig_mu_x=random_field.random_field)
 
-    print '---------------'
-    print ctt.BC_x
-    print '----------------'
+    print('---------------')
+    print((ctt.BC_x))
+    print('----------------')
     sig_c_i, z_x_i, BC_x_i, sig_c_u, n_crack = ctt.get_cracking_history(plt)
 #     eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
-    print '1.5%', [sig_c_i]
-    print np.sort(ctt.y)
+    print(('1.5%', [sig_c_i]))
+    print((np.sort(ctt.y)))
 
     load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 100), sig_c_i)))
     eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)

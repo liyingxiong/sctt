@@ -1,12 +1,12 @@
 from traits.api import \
     HasStrictTraits, Instance, Button, Event, Property, cached_property
-from composite_tensile_test import CompositeTensileTest
+from .composite_tensile_test import CompositeTensileTest
 from matplotlib.figure import Figure
 from etsproxy.traits.ui.api import \
     View, Item, Group, HSplit, VGroup, HGroup, RangeEditor, InstanceEditor
 from util.traits.editors.mpl_figure_editor import MPLFigureEditor
-from random_fields.simple_random_field import SimpleRandomField
-from crack_bridge_models.constant_bond_cb import ConstantBondCB
+from .random_fields.simple_random_field import SimpleRandomField
+from .crack_bridge_models.constant_bond_cb import ConstantBondCB
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.hom_CB_elastic_mtrx \
     import CompositeCrackBridge
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \

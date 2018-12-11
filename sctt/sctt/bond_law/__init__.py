@@ -67,7 +67,7 @@ for k, w in enumerate(np.linspace(1e-5, 1, 100)):
     bond_arr[:, k] = interp_bond(x_arr)
 
 # print ccb._x_arr
-print len(slip_arr[0,:])
+print((len(slip_arr[0,:])))
 
 for j in np.hstack((np.arange(10, 499, 50), np.arange(451, 499, 3))):
 

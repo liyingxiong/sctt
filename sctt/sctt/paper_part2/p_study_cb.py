@@ -93,7 +93,7 @@ from scipy.stats import linregress
 x = np.linspace(0.002, 0.005, 50)
 y = np.interp(x, eps_c_arr, load_arr)
 slope, intercept, r_value, p_value, std_err = linregress(x, y)
-print '1%', slope
+print(('1%', slope))
 
 
 plt.plot(eps_c_arr, load_arr)

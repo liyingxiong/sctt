@@ -255,7 +255,7 @@ for m in [6., 7., 8., 9.]:
         mean = np.average(cali.tau_arr, weights = cali.tau_weights)
         mean_list.append(mean)
 
-print mean_list
+print(mean_list)
 
     
     #===============================================================================

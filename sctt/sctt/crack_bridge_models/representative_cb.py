@@ -9,7 +9,7 @@ from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement \
     import ContinuousFibers
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.hom_CB_elastic_mtrx \
     import CompositeCrackBridge
-from random_bond_cb import RandomBondCB, FiberBundle
+from .random_bond_cb import RandomBondCB, FiberBundle
 from scipy.interpolate import interp2d, griddata, LinearNDInterpolator
 from scipy.optimize import brentq, fmin, brute, fminbound
 from mpl_toolkits.mplot3d import axes3d
@@ -17,7 +17,7 @@ from util.traits.either_type import EitherType
 import time as t
 import os.path
 from scipy.interpolate import interp1d
-from random_bond_cb import RandomBondCB, FiberBundle
+from .random_bond_cb import RandomBondCB, FiberBundle
 
 
 
@@ -97,9 +97,9 @@ class RepresentativeCB(HasStrictTraits):
 #         print 'w_max', 'sig_cu', w_max[0][0], sig_cu
         self.ccb.w = w_max
         Lmax = self.ccb._x_arr[-2]
-        print Lmax
+        print(Lmax)
         bc_range = np.logspace(np.log10(0.02*Lmax), np.log10(Lmax), self.n_BC)
-        print bc_range
+        print(bc_range)
         return bc_range, sig_cu, w_max
     
     BC_range = Property(depends_on='n_BC, CB_model')
@@ -131,7 +131,7 @@ class RepresentativeCB(HasStrictTraits):
         interps_sigm = []
         interps_epsf = []
         t1 = t.clock()
-        print 'preparing the interpolators:'
+        print('preparing the interpolators:')
         for j, L_r in enumerate(self.BC_range):
             for q, L_l in enumerate(self.BC_range):
                 if L_l <= L_r:
@@ -185,12 +185,12 @@ class RepresentativeCB(HasStrictTraits):
                     interp_epsf = interp2d(x_arr_record, sigc_record, epsf_record)
                     interp_sigm = interp2d(x_arr_record, sigc_record, sigm_record)
                     
-                    print ((j+1)*j/2+q+1)*100/(self.n_BC*(self.n_BC+1)/2), '%'
+                    print((((j+1)*j/2+q+1)*100/(self.n_BC*(self.n_BC+1)/2), '%'))
                     
                     interps_epsf.append(interp_epsf)
                     interps_sigm.append(interp_sigm)
                     
-        print 'time consumed:', t.clock()-t1
+        print(('time consumed:', t.clock()-t1))
         return interps_epsf, interps_sigm
     
     #=============================================================================
@@ -270,7 +270,7 @@ if __name__ == '__main__':
     
     rcb = RepresentativeCB(ccb=cb1)
     
-    print rcb.sig_cu
+    print((rcb.sig_cu))
 #     print scb.data[0].shape
 #     print scb.data[1].shape
      

@@ -46,7 +46,7 @@ for i in range(5):
 # matrix parameters
 m_scale = 3.50
 m_shape = interp_m_shape(m_scale)
-print m_shape
+print(m_shape)
 
 
 # v_f=1.0%
@@ -82,8 +82,8 @@ ctt = CompositeTensileTest(n_x=400,
 
 sig_c_i, z_x_i, BC_x_i, sig_c_u = ctt.get_cracking_history()
 
-print '1.0%', [sig_c_i]
-print np.sort(ctt.y)
+print(('1.0%', [sig_c_i]))
+print((np.sort(ctt.y)))
 
 
 load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 50), sig_c_i)))
@@ -128,8 +128,8 @@ ctt = CompositeTensileTest(n_x=400,
 sig_c_i, z_x_i, BC_x_i, sig_c_u = ctt.get_cracking_history()
 eps_c_i = ctt.get_eps_c_i(sig_c_i, z_x_i, BC_x_i)
 
-print '1.5%', [sig_c_i]
-print np.sort(ctt.y)
+print(('1.5%', [sig_c_i]))
+print((np.sort(ctt.y)))
 
 load_arr = np.unique(np.hstack((np.linspace(0, sig_c_u, 50), sig_c_i)))
 eps_c_arr = ctt.get_eps_c_arr(sig_c_i, z_x_i, BC_x_i, load_arr)

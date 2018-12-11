@@ -57,7 +57,7 @@ levels = np.arange(np.amin(lack_of_fit), np.amax(
 # levels = np.hstack(
 #     (np.linspace(9, 19, 11), np.linspace(22 ** 0.5, np.sqrt(np.amax(lack_of_fit)), 10) ** 2))
 # levels = [5, 6, 7, 8, 9, 11, 13, 15, 17, 20, 24, 29, 35, 41, 47]
-print levels
+print(levels)
 CS = plt.contour(lack_of_fit, levels,
                  origin='lower',
                  cmap=cm.gray,

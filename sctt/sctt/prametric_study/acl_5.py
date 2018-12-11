@@ -53,7 +53,7 @@ for j in range(5):
     eps_max_lst.append(
         np.amax(-data[:, 2] / 2. / 250. - data[:, 3] / 2. / 250.))
 eps_max = np.amin(eps_max_lst)
-print eps_max
+print(eps_max)
 eps_arr = np.linspace(0, eps_max, 100)
 interp_exp = interp1d(eps[0:1500],
                       sig[0:1500], bounds_error=False, fill_value=0.)

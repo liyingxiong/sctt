@@ -1,21 +1,21 @@
-from traits.api import HasTraits, Array, Instance, List, Float, Int, \
+
+
+from matplotlib import pyplot as plt
+from scipy.integrate import cumtrapz
+from scipy.interpolate import interp2d, griddata
+from scipy.optimize import root, fminbound, brute
+from traits.api import HasTraits, Array, List, Float, Int, \
     Property, cached_property
-from util.traits.either_type import EitherType
-from types import FloatType
-from spirrid.rv import RV
-from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
+
+import numpy as np
 from quaducom.meso.homogenized_crack_bridge.elastic_matrix.reinforcement import \
     ContinuousFibers
 from sctt.reinforcements.fiber_bundle import FiberBundle
-import numpy as np
-from scipy.optimize import root, brentq, fminbound, brute, minimize, fmin_cg, fsolve, \
-    broyden2, broyden1, newton_krylov, basinhopping, minimize_scalar
-from scipy.integrate import cumtrapz
+from spirrid.rv import RV
+from stats.pdistrib.weibull_fibers_composite_distr import WeibullFibers
 import time as t
-from matplotlib import pyplot as plt
-from scipy.interpolate import interp1d, interp2d, griddata, LinearNDInterpolator
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
+import traitsui.api as tu
+from util.traits.either_type import EitherType
 
 
 class RandomBondCB(HasTraits):
@@ -25,7 +25,9 @@ class RandomBondCB(HasTraits):
     #=========================================================================
     reinforcement_lst = List(
         EitherType(klasses=[FiberBundle, ContinuousFibers]))
-    E_m = Float(25e3)  # the elastic modulus of the matrix
+
+    E_m = Float(25e3, auto_set=False, enter_set=True, MAT=True,
+                desc='Elastic modulus of matrix')
     w = Float  # the crack width
     # the BCs
     Lr = Float
@@ -147,7 +149,7 @@ class RandomBondCB(HasTraits):
         masks = []
         for reinf in self.reinforcement_lst:
             masks.append(self.sorted_xi == reinf.xi)
-            if isinstance(reinf.xi, FloatType):
+            if isinstance(reinf.xi, float):
                 methods.append(lambda x: 1.0 * (reinf.xi <= x))
             elif isinstance(reinf.xi, RV):
                 methods.append(reinf.xi._distr.cdf)
@@ -423,7 +425,8 @@ class RandomBondCB(HasTraits):
     def max_sig_c(self, Ll, Lr):  # need further improvement
         self.Ll = Ll
         self.Lr = Lr
-        minus_sig_c = lambda w: -self.sig_c(w)
+
+        def minus_sig_c(w): return -self.sig_c(w)
         w_upper_bound = min(0.1 * (self.Ll + self.Lr), 20)
         # determine the bound for fminbound
         mid = brute(self.minus_sig_c, ((1e-3, w_upper_bound),), Ns=10,
@@ -454,12 +457,11 @@ class RandomBondCB(HasTraits):
         for reinf in self.reinforcement_lst:
             n_Int += reinf.n_int
         return n_Int
-#
-    #=========================================================================
-    # discretization of the boundary condition
-    #=========================================================================
-    BC_range = Property(depends_on='reinforcement_lst+, E_m')
 
+    BC_range = Property(depends_on='reinforcement_lst+, E_m')
+    '''
+    Discretization of the boundary condition
+    '''
     @cached_property
     def _get_BC_range(self):
         self.w = self.max_sig_c(1e5, 1e5)[1]
@@ -467,14 +469,12 @@ class RandomBondCB(HasTraits):
         L_max = min(self._x_arr[-2], self.L_max)  # maximum debonding length
         BC_range = np.logspace(
             np.log10(0.02 * L_max), np.log10(L_max), self.n_BC)
-#         print BC_range
         return BC_range
-#
-    #=========================================================================
-    # prepare the interpolator for each Boundary Condition
-    #=========================================================================
-    interps = Property(denpends_on='reinforcement_lst+, Ll, Lr, n_BC, E_m')
 
+    interps = Property(denpends_on='reinforcement_lst+, Ll, Lr, n_BC, E_m')
+    '''
+    Prepare the interpolator for each boundary condition
+    '''
     @cached_property
     def _get_interps(self):
         interps_sigm = []
@@ -482,7 +482,7 @@ class RandomBondCB(HasTraits):
         sig_max_lst = []
 #         interps_damage = []
         t1 = t.clock()
-        print 'preparing the interpolators:'
+        print('preparing the interpolators:')
         for j, L_r in enumerate(self.BC_range):
             for q, L_l in enumerate(self.BC_range):
                 if L_l <= L_r:
@@ -551,7 +551,7 @@ class RandomBondCB(HasTraits):
                     sig_max_lst.append(sigma_max)
 #                     interps_damage.append(interp_damage)
 
-        print 'time consumed:', t.clock() - t1
+        print(('time consumed:', t.clock() - t1))
         return interps_epsf, interps_sigm, np.array(sig_max_lst)
 #
     #=========================================================================
@@ -563,7 +563,8 @@ class RandomBondCB(HasTraits):
         l, r = np.sort([Ll, Lr])
         i = min(np.sum(self.BC_range - l < 0), self.n_BC - 1)
         j = min(np.sum(self.BC_range - r < 0), self.n_BC - 1)
-        return (j + 1) * j / 2 + i
+        ij = int((j + 1) * j / 2 + i)
+        return ij
 
     # function for evaluating specimen reinforcement strain
     def get_eps_f_z(self, z_arr, Ll_arr, Lr_arr, load):
@@ -578,10 +579,21 @@ class RandomBondCB(HasTraits):
     def get_sig_m_z(self, z_arr, Ll_arr, Lr_arr, load):
         def get_sig_m_i(self, z, Ll, Lr, load):
             ind = self.get_index(Ll, Lr)
+            print('indexes', ind)
             f = self.interps[1][ind]
             return f(z, load)
         v = np.vectorize(get_sig_m_i)
         return v(self, z_arr, Ll_arr, Lr_arr, load)
+
+    traits_view = tu.View(
+        tu.Item('E_m', full_size=True, resizable=True),
+        tu.Item('Lr', style='readonly',
+                full_size=True),
+        tu.Item('Ll', style='readonly')
+    )
+
+    tree_view = traits_view
+
 
 if __name__ == '__main__':
 
@@ -592,8 +604,7 @@ if __name__ == '__main__':
     #                       E_f=240e3,
     #                       xi=0.035)
     from stats.pdistrib.weibull_fibers_composite_distr import \
-        WeibullFibers, fibers_MC
-    from scipy.optimize import brentq
+        fibers_MC
 
     reinf = ContinuousFibers(r=3.5e-3,
                              tau=RV(
@@ -609,12 +620,12 @@ if __name__ == '__main__':
                        Ll=150.,
                        Lr=150.,
                        L_max=400,
-                       n_BC=12)
+                       n_BC=7)
 
     z_arr = np.linspace(0, 150, 300)
     Ll_arr = 150. * np.ones_like(z_arr)
     Lr_arr = 5. * np.ones_like(z_arr)
-    for load in [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]:
+    for load in np.linspace(1.5, 4.5, 3):
         sig_m = ccb.get_sig_m_z(z_arr, Ll_arr, Lr_arr, load)
         plt.plot(z_arr, sig_m, label='load=' + str(load))
     plt.xlim((0, 120))

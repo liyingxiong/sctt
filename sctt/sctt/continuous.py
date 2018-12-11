@@ -11,7 +11,7 @@ from traits.api import HasTraits, \
     HasStrictTraits, Array
 from scipy.optimize import brute, fmin_slsqp
 from scipy.optimize import curve_fit
-from calibration import Calibration
+from .calibration import Calibration
 import os.path
 from scipy.interpolate import interp1d
 from scipy.stats import gamma as gam

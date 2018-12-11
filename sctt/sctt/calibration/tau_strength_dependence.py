@@ -36,10 +36,10 @@ def interp_tau_scale(s_f, psi_f):
 
 if __name__ == '__main__':
     
-    print [tau_scale*tau_shape]
-    print [tau_scale**2*tau_shape]
+    print([tau_scale*tau_shape])
+    print([tau_scale**2*tau_shape])
 #     print tau_shape
     
-    print interp_tau_shape(0.0095, 7.0)
-    print interp_tau_scale(0.0095, 7.0)
+    print((interp_tau_shape(0.0095, 7.0)))
+    print((interp_tau_scale(0.0095, 7.0)))
     

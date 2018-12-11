@@ -3,7 +3,7 @@ Created on Jan 22, 2015
 
 @author: Li Yingxiong
 '''
-from tau_strength_dependence import interp_tau_shape, interp_tau_scale
+from .tau_strength_dependence import interp_tau_shape, interp_tau_scale
 import numpy as np
 from crack_bridge_models.random_bond_cb import RandomBondCB
 from stats.pdistrib.weibull_fibers_composite_distr import \
@@ -45,7 +45,7 @@ for m in m_arr:
 
     sV0_arr.append(brentq(strength0, 1e-15, 0.020))
 
-print sV0_arr
+print(sV0_arr)
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')

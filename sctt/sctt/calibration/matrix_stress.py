@@ -1,7 +1,7 @@
 from sctt_aramis import CTTAramis
 import numpy as np
 from matplotlib import pyplot as plt
-from tau_strength_dependence import interp_tau_shape, interp_tau_scale
+from .tau_strength_dependence import interp_tau_shape, interp_tau_scale
 from stats.pdistrib.weibull_fibers_composite_distr import \
     WeibullFibers, fibers_MC
 from crack_bridge_models.random_bond_cb import RandomBondCB
@@ -310,15 +310,15 @@ bin_arr = np.linspace(0.0, 6., 25)
 
 # hist, bins = np.histogram(stress4_arr, bins=bin_arr)
 plt.hist(stress4, bin_arr,  color='0.3', label='1')
-print 'avg', np.average(stress4)
-print 'COV', variation(stress4)
+print(('avg', np.average(stress4)))
+print(('COV', variation(stress4)))
 # plt.hist(rec_4*(cb.E_m/cb.E_c), bin_arr, label='mixture rule')
 plt.xlabel('matrix stress[MPa]')
 plt.legend()
 plt.figure()
 plt.hist(stress6, bin_arr,  color='0.5', alpha=0.7, label='1.5')
-print 'avg', np.average(stress6)
-print 'COV', variation(stress6)
+print(('avg', np.average(stress6)))
+print(('COV', variation(stress6)))
 # plt.hist(rec_6*(cb2.E_m/cb2.E_c), bin_arr, label='mixture rule')
 plt.xlabel('matrix stress[MPa]')
 # plt.legend()

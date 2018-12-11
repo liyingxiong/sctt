@@ -53,9 +53,9 @@ for j in range(5):
         f, params, method='powell', args=(eps_arr, interp_exp(eps_arr)))
 
     final = interp_exp(eps_arr) + result.residual
-    print params
+    print(params)
 #     print interp_exp(params['a'].value)
-    print interp_exp(params['a'].value) * 25 / (25 * 0.985 + 2.7)
+    print((interp_exp(params['a'].value) * 25 / (25 * 0.985 + 2.7)))
     if j == 1:
         plt.plot(eps_arr, interp_exp(eps_arr))
         plt.plot(eps_arr, final, 'k--')
